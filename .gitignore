@@ -21,6 +21,15 @@ evaluation.json
 # Environment variables (contains secrets)
 .env
 
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
+
 # OS files
 .DS_Store
 
