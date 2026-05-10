@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Subscription {
+  FREE
+  PREMIUM
+
+  @@map("subscription")
+}
+
+enum QuizStepEnum {
+  AGE_RANGE
+  GENDER
+  BODY_DATA
+  GOALS
+  EXERCISE_FREQUENCY
+
+  @@map("quiz_step")
+}
+
+enum PaymentStatus {
+  COMPLETED
+  FAILED
+
+  @@map("payment_status")
+}
+
+model User {
+  id           String       @id @default(uuid())
+  sessionId    String       @unique
+  subscription Subscription @default(FREE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  quizSteps     QuizStep[]
+  healthResult  HealthResult?
+  payments      PaymentRecord[]
+
+  @@map("users")
+}
+
+model QuizStep {
+  id        String       @id @default(uuid())
+  step      QuizStepEnum
+  data      Json
+  userId    String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, step])
+  @@map("quiz_steps")
+}
+
+model HealthResult {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  bmi                 Float
+  bmiCategory         String
+  bmr                 Float
+  tdee                Float
+  recommendedCalories Int
+  targetDate          DateTime
+  weeklyProjection    Json
+  planDetails         Json
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("health_results")
+}
+
+model PaymentRecord {
+  id        String        @id @default(uuid())
+  userId    String
+  amount    Int
+  status    PaymentStatus
+  createdAt DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("payment_records")
+}
