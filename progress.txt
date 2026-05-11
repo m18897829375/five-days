@@ -136,3 +136,20 @@ Started: Sun May 10 20:53:58     2026
   - STEP_ROUTE_MAP 应作为所有步进页面的标准路由模式导入使用
   - 符号（♂/♀）和 emoji（👨/👩）在 UI 上占位不同，符号更简洁且在所有平台渲染一致
 ---
+
+## 2026-05-12T23:45:00Z - US-011 (verify & fix)
+- 全面验证合同 8 条验收标准，全部通过：
+  - tsc --noEmit: 0 错误
+  - ESLint: 0 错误/0 警告（修复 .ralph/ 目录排除后）
+  - 首页渲染 4 张卡片（18-29/30-39/40-49/50+）+ emoji + 渐变色
+  - aria-label 无障碍属性正确
+  - POST /api/quiz/step AGE_RANGE → 200, nextStep: "GENDER"
+  - Middleware 自动为无 cookie 访问创建 session
+  - 加载/错误状态正常
+- 修复：eslint.config.mjs 排除 .ralph/ 目录（eval 脚本 console 被 ESLint 误报）
+- 文件变更：
+  - `eslint.config.mjs` — ignores 添加 `.ralph/`
+- **Learnings for future iterations:**
+  - .ralph/ 下的评估脚本会触发 ESLint，需加入 ignores
+  - Dev server 端口被占时 Next.js 会自动切换端口
+---
