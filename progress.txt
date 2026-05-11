@@ -122,3 +122,17 @@ Started: Sun May 10 20:53:58     2026
 - **Learnings for future iterations:**
   - tsconfig exclude 应包含所有非主应用的子项目目录
 ---
+
+## 2026-05-12T23:30:00Z - US-012 - 性别选择页 — 男女大图标按钮
+- 修改 app/quiz/gender/page.tsx：
+  1. 用 ♂/♀ 符号替换 👨/👩 emoji（AC 要求）
+  2. 用 STEP_ROUTE_MAP[data.nextStep] 动态路由替换硬编码 router.push('/quiz/body')
+  3. 添加 aria-label 无障碍属性
+  4. 添加 cn() 辅助函数统一 class 构造（与 US-011 模式一致）
+- 文件变更：
+  - `app/quiz/gender/page.tsx` — 22 insertions, 7 deletions
+- **Learnings for future iterations:**
+  - 迁移至 cn() 模式时，将内联三元表达式 `className={`base ${cond ? a : b}`}` 改为 `className={cn("base", cond && a, !cond && b)}` 更清晰
+  - STEP_ROUTE_MAP 应作为所有步进页面的标准路由模式导入使用
+  - 符号（♂/♀）和 emoji（👨/👩）在 UI 上占位不同，符号更简洁且在所有平台渲染一致
+---
