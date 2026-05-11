@@ -23,6 +23,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["node_modules/", ".next/", "scripts/"],
+    ignores: ["node_modules/", ".next/", "scripts/", ".ralph/"],
   },
 )
