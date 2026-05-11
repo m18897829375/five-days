@@ -106,3 +106,19 @@ Started: Sun May 10 20:53:58     2026
   - `@eslint/eslintrc` FlatCompat 在 ESLint 9 下有循环引用 bug，直接用 typescript-eslint 原生 flat config 更稳定
   - 本地 Docker PostgreSQL 可替代 Supabase 进行开发验证
 ---
+
+## 2026-05-12T20:00:00Z - US-011
+- 修复 tsconfig.json 排除 `scripts` 目录，确保 tsc --noEmit 零错误（子项目 flowchart 有独立构建系统）
+- 验证全部 8 条验收标准通过：
+  - 首页 / 展示 4 张年龄卡片（18-29/30-39/40-49/50+）+ emoji + 渐变色
+  - 点击卡片调用 POST /api/quiz/step 提交 AGE_RANGE → 200, nextStep: GENDER
+  - 无 cookie 访问 / → middleware 创建 session + 设置 cookie
+  - 已完成 AGE_RANGE 的 session 访问 / → 307 重定向到 /quiz/gender
+  - 卡片加载态（ring + opacity + disabled）
+  - API 错误态（红色提示，不跳转）
+  - tsc --noEmit: 0 错误，ESLint: 0 错误/0 警告
+- 文件变更：
+  - `tsconfig.json` — exclude 添加 "scripts"
+- **Learnings for future iterations:**
+  - tsconfig exclude 应包含所有非主应用的子项目目录
+---
