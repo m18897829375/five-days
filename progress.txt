@@ -1,0 +1,83 @@
+# Ralph Progress Log
+Started: Sun May 10 20:53:58     2026
+
+## Codebase Patterns
+- **Prisma 7**: `url`/`directUrl` 不再在 schema.prisma 中定义，必须在 `prisma.config.ts` 中使用 `defineConfig({ datasource: { url: env('DATABASE_URL') } })`。Schema 中 datasource 块只保留 `provider = "postgresql"`。
+- **Prisma 7 Enum/Model 命名**: Prisma 不允许 enum 和 model 同名。之前 `QuizStep` 同时是 enum 和 model 导致验证错误。解决方案：enum 命名为 `QuizStepEnum`，model 保持 `QuizStep`。
+- **Prisma 7 Client**: `@prisma/client` 导入仍可用。`prisma generate` 默认输出到 `node_modules/@prisma/client`，generator 不需要 `output` 配置。
+- **Prisma 7 auto-loads .env**: `prisma.config.ts` 会自动加载项目根目录的 `.env` 文件，无需手动 `dotenv/config`。
+- **Supabase + Prisma 7**: `directUrl` 概念在 Prisma 7 的 `prisma.config.ts` 中不存在。`prisma db push` 使用 `datasource.url`。对 Supabase PgBouncer，`DATABASE_URL` 应指向直连端口 5432（DDL 需要），运行时客户端可用连接池端口 6543。
+- **TypeScript 6 + moduleResolution bundler**: `process.env` 需要 `@types/node`。tsconfig 中添加 `"types": ["node"]` 以引入 Node.js 全局类型。
+- **tsconfig for Next.js 16**: compilerOptions 使用 `module: "esnext"` + `moduleResolution: "bundler"`，包含 `plugins: [{ "name": "next" }]`。
+- **Zod 分层模式**: schemas.ts 定义 Zod 验证规则，types.ts 通过 `import type { z }` + `z.infer` 纯类型层导出。import type 避免运行时代码引入。
+- **ApiResponse 泛型**: Zod schema 做函数封装 `(dataSchema) => z.object(...)`，TypeScript 类型用纯泛型 `ApiResponse<T>` 定义。
+
+---
+
+## 2026-05-10T22:50:00Z - US-001
+- 实现了 Prisma Schema 与数据库初始化
+- 文件变更：
+  - `prisma/schema.prisma` — 4 模型 (User/QuizStep/HealthResult/PaymentRecord) + 3 枚举 (Subscription/QuizStepEnum/PaymentStatus) + 关系定义
+  - `prisma.config.ts` — Prisma 7 配置，datasource url 从环境变量读取
+  - `lib/prisma.ts` — PrismaClient 单例 (globalThis 缓存模式)
+  - `tsconfig.json` — Next.js 16 + TypeScript 6 配置
+  - `next-env.d.ts` — Next.js 类型引用
+  - `.env.example` — 数据库连接模板 (DATABASE_URL + DIRECT_URL)
+  - `.gitignore` — 添加 .env 忽略规则
+- `npx prisma validate` 通过
+- `npx prisma generate` 通过 (Client v7.8.0)
+- `npx tsc --noEmit` 通过 (0 错误)
+- `npx prisma db push` 需要有效 Supabase 凭据 (占位符无法连接)
+- **Learnings for future iterations:**
+  - Prisma 7 架构变化大：schema.prisma 仅建模，连接配置移入 prisma.config.ts
+  - Enum 和 Model 命名冲突是 Prisma 编译时错误，需提前规避
+  - TypeScript 6 bundler 模式不自动引入 @types/node，需显式配置
+  - Next.js 16 项目初始化时需 tsconfig + next-env.d.ts 配合
+  - Lint 在无 pages/app 目录时不可用，后续故事中自然解决
+---
+
+## 2026-05-11T00:00:00Z - US-002 (retry 2)
+- 实现了 TypeScript 类型定义与 Zod 验证层
+- 文件变更：
+  - `lib/schemas.ts` — 5 步 Zod schema（ageRangeSchema/genderSchema/bodyDataSchema/goalsSchema/exerciseSchema）+ ApiErrorSchema + ApiResponseSchema 泛型构造器
+  - `lib/types.ts` — z.infer 推断类型（AgeRangeData/GenderData/BodyData/GoalsData/ExerciseData）+ QuizStepData 联合类型 + ApiResponse\<T\> 泛型 + ApiError
+- `npx tsc --noEmit` 通过（0 错误）
+- **Learnings for future iterations:**
+  - Zod 4.x 中传统 API（z.object/z.enum/z.number/z.array/z.infer）完全可用
+  - ApiResponseSchema 设计为泛型函数：`<T extends z.ZodTypeAny>(dataSchema: T) => z.object({...})`，保持类型安全同时允许不同 data schema
+  - z.infer 导入用 `import type` 避免运行时代码引入，仅用于类型层
+  - ApiResponse\<T\> 用纯 TypeScript 泛型定义，比从 Zod schema 推断更灵活（支持可选 data/error 字段）
+  - 上一轮失败原因回顾：Generator 未产出任何代码。本轮从头创建两个核心文件。
+---
+
+## 2026-05-11T01:00:00Z - US-003
+- 实现了 POST /api/session 匿名会话管理
+- 文件变更：
+  - `app/api/session/route.ts` — POST 路由处理器，含幂等逻辑
+- `npx tsc --noEmit` 通过
+- **Learnings for future iterations:**
+  - Next.js 16 cookies() 返回 Promise，需 await
+  - crypto.randomUUID() 在 Node 19+ 可用（无需 uuid 包）
+  - Prisma 7 adapter-pg 使用 DATABASE_URL 直连端口 5432
+---
+
+## 2026-05-11T12:00:00Z - US-004
+- 实现了 POST /api/quiz/step 分步数据保存
+- 文件变更：
+  - `app/api/quiz/step/route.ts` — POST 路由处理器，含 Zod 验证 + upsert 幂等
+- `npx tsc --noEmit` 通过（0 错误）
+- 验收测试全部通过：
+  - 合法提交 AGE_RANGE → 200, nextStep: "GENDER"
+  - 非法枚举值 ageRange:"invalid" → 400, code:VALIDATION_ERROR, field:ageRange
+  - 越界值 age:150 → 400, code:VALIDATION_ERROR, field:age
+  - 空数组 goals:[] → 400, code:VALIDATION_ERROR, field:goals
+  - 无效步骤 INVALID → 400, field:step, received:"INVALID"
+  - 无 cookie → 401 UNAUTHORIZED
+  - 重复提交 AGE_RANGE → 200 幂等返回相同 nextStep
+  - 完整 5 步链路: AGE_RANGE→GENDER→BODY_DATA→GOALS→EXERCISE_FREQUENCY，最后 nextStep:null
+- **Learnings for future iterations:**
+  - Prisma Json 字段类型为 `InputJsonValue`，需将 Zod 解析结果显式 cast（`as Prisma.InputJsonValue`）
+  - Zod 4 safeParse 失败时 error.issues[0].path 获取字段名，error.issues[0].message 获取描述
+  - 路由文件置于 `app/api/quiz/step/route.ts` 对应端点 `/api/quiz/step`
+  - Upsert 使用复合唯一键 `where: { userId_step: { userId, step } }` 自动防重复
+---
