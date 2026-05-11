@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation"
 import ProgressBar from "@/components/ProgressBar"
 import StepPage from "@/components/StepPage"
 
+const STEP_ROUTE_MAP: Record<string, string> = {
+  AGE_RANGE: "/",
+  GENDER: "/quiz/gender",
+  BODY_DATA: "/quiz/body",
+  GOALS: "/quiz/goals",
+  EXERCISE_FREQUENCY: "/quiz/exercise",
+}
+
 const AGE_OPTIONS = [
   { value: "18-29", label: "18-29 岁", emoji: "🧑", gradient: "from-blue-400 to-blue-600" },
   { value: "30-39", label: "30-39 岁", emoji: "👨", gradient: "from-green-400 to-green-600" },
@@ -31,7 +39,8 @@ export default function HomePage() {
         setError(data.error?.message ?? "网络错误，请重试")
         return
       }
-      router.push("/quiz/gender")
+      const nextRoute = data.nextStep ? STEP_ROUTE_MAP[data.nextStep] : "/results"
+      if (nextRoute) router.push(nextRoute)
     } catch {
       setError("网络错误，请重试")
     } finally {
