@@ -448,14 +448,14 @@
     },
     {
       "id": "US-011",
-      "title": "步骤页 1-2 — 年龄选择 + 性别",
-      "description": "As a user, I want to select my age range from 4 photo cards and choose my gender, with each selection auto-saving and advancing to the next step.",
+      "title": "年龄选择首页 — 4 张年龄卡片",
+      "description": "As a user, I want to see 4 age range cards on the homepage and click one to submit my age range.",
       "acceptanceCriteria": [
-        "/ page shows 4 age range cards (18-29/30-39/40-49/50+) with person photos and labels, click to submit",
-        "/quiz/gender page shows male/female selection with large icon buttons",
-        "Each step submits POST /api/quiz/step on selection, auto-navigates to nextStep",
-        "Validation error shows red error message near affected field",
-        "Mobile responsive (primary target: phone users)",
+        "首页（/）展示 4 张年龄卡片：18-29 / 30-39 / 40-49 / 50+",
+        "每张卡片包含图片或图标 + 年龄范围文字",
+        "点击卡片自动调用 POST /api/quiz/step 提交 { step: AGE_RANGE, data: { ageRange } }",
+        "提交成功后根据 nextStep 字段自动跳转到 /quiz/gender",
+        "sessionId 不存在时跳转到 /api/session 后重定向回 /",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
@@ -492,16 +492,13 @@
     },
     {
       "id": "US-012",
-      "title": "步骤页 3-5 — 身体数据 + 目标 + 运动频率",
-      "description": "As a user, I want to input my body metrics, select my goals, and choose my exercise frequency across 3 sequential form steps.",
+      "title": "性别选择页 — 男女大图标按钮",
+      "description": "As a user, I want to select male or female from large icon buttons on the gender page.",
       "acceptanceCriteria": [
-        "/quiz/body shows 4 number inputs (age, height cm, current weight kg, target weight kg) with unit labels",
-        "/quiz/goals shows multi-select cards (lose_weight/tone_muscle/build_muscle/stay_healthy) with min 1 selection",
-        "/quiz/exercise shows 5-level radio list (sedentary/light/moderate/active/very_active)",
-        "Each step submits POST /api/quiz/step on continue, auto-navigates to nextStep",
-        "After final step, auto-redirects to /results",
-        "Validation errors display inline per field with specific messages",
-        "Mobile responsive",
+        "/quiz/gender 页面展示 2 个大图标按钮：男（♂）+ 女（♀）",
+        "点击按钮调用 POST /api/quiz/step 提交 { step: GENDER, data: { gender: male|female } }",
+        "提交成功后根据 nextStep 字段自动跳转到 /quiz/body",
+        "直接访问 /quiz/gender 但未完成 AGE_RANGE 步骤时，由 middleware 重定向到 /",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
@@ -538,15 +535,15 @@
     },
     {
       "id": "US-013",
-      "title": "结果页 — FREE 预览状态",
-      "description": "As a FREE user, I want to see my health assessment core metrics (BMI, calories, target date, weight loss estimate) with locked areas teasing the full report behind a paywall.",
+      "title": "身体数据表单页 — 4 个数字输入",
+      "description": "As a user, I want to enter my body metrics (age/height/weight) on a form page with validation.",
       "acceptanceCriteria": [
-        "/results page loads via GET /api/results and displays FREE state",
-        "4 metric cards visible: BMI with category, daily calorie recommendation, target date, estimated weight loss",
-        "Weight projection area shows frosted glass overlay with lock icon and CTA button: 解锁完整方案 — ¥99",
-        "Diet/exercise plan area shows frosted glass overlay with lock icon",
-        "Skeleton loading screen while API request is in flight",
-        "Mobile responsive layout (stacked cards on mobile)",
+        "/quiz/body 展示 4 个数字输入：年龄、身高(cm)、当前体重(kg)、目标体重(kg)",
+        "每个输入带单位标签（cm / kg）",
+        "前端 Zod 验证：age 10-120, height 50-300, currentWeight 20-500, targetWeight 20-500",
+        "验证失败时在对应字段下方显示红色错误提示",
+        "点击继续按钮调用 POST /api/quiz/step 提交 { step: BODY_DATA, data: { age, height, currentWeight, targetWeight } }",
+        "提交成功后根据 nextStep 自动跳转到 /quiz/goals",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
@@ -583,16 +580,14 @@
     },
     {
       "id": "US-014",
-      "title": "结果页 — 支付弹窗 + PREMIUM 完整报告",
-      "description": "As a user, I want to pay via a modal, see my subscription upgrade instantly, and view the full unlocked report with weight projection chart and personalized diet/exercise plan.",
+      "title": "目标选择页 — 多选卡片",
+      "description": "As a user, I want to select one or more fitness goals from multi-select cards.",
       "acceptanceCriteria": [
-        "Clicking CTA button opens PayModal with: ¥99 amount, confirm button, cancel button",
-        "Confirm calls POST /api/pay, on success closes modal and refreshes results showing PREMIUM data",
-        "Payment failure shows error message in modal with retry button",
-        "PREMIUM results: weight projection chart (pure CSS line chart or Chart.js), full weeklyProjection data",
-        "PREMIUM results: planDetails section with protein/carbs/fat breakdown (percentage + grams), exercise plan, daily tips",
-        "Page refresh maintains PREMIUM state (sessionId cookie persists)",
-        "Already PREMIUM users see full data immediately, no paywall",
+        "/quiz/goals 展示 4 张多选卡片：减重(lose_weight) / 塑形(tone_muscle) / 增肌(build_muscle) / 保持健康(stay_healthy)",
+        "至少选择 1 个目标，少于 1 个时继续按钮置灰或提示错误",
+        "选中卡片有视觉高亮（边框变色或勾选标记）",
+        "点击继续调用 POST /api/quiz/step 提交 { step: GOALS, data: { goals: [...] } }",
+        "提交成功后根据 nextStep 自动跳转到 /quiz/exercise",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
@@ -629,17 +624,16 @@
     },
     {
       "id": "US-015",
-      "title": "端到端流程串联与异常处理",
-      "description": "As a system, I need to ensure the complete user journey has no gaps or crashes, covering all error paths: skip steps, invalid data, duplicate payments, missing steps on complete, session loss.",
+      "title": "运动频率选择页 — 5 级单选",
+      "description": "As a user, I want to select my weekly exercise frequency from 5 levels.",
       "acceptanceCriteria": [
-        "Full flow test: / → 5 steps → /results(FREE) → pay → /results(PREMIUM) with no errors",
-        "Progress recovery: fill 3 steps → close tab → reopen → auto-redirect to step 4",
-        "Skip-step test: direct visit /quiz/goals → redirect to earliest incomplete step",
-        "Boundary test: submit height:3000 → 400 VALIDATION_ERROR with field=height",
-        "Duplicate payment test: PREMIUM user calls /pay → 409 ALREADY_PREMIUM",
-        "Incomplete complete test: only 3 steps done, call /api/quiz/complete → 400 INCOMPLETE_QUIZ with missingSteps",
-        "No-session results test: returns 404",
-        "Typecheck + Lint pass"
+        "/quiz/exercise 展示 5 级单选列表：久坐(sedentary) / 轻度(light) / 中度(moderate) / 活跃(active) / 非常活跃(very_active)",
+        "每个选项有描述文字（如：久坐 — 几乎不运动，每周少于 1 次）",
+        "选中选项有视觉高亮",
+        "点击继续调用 POST /api/quiz/step 提交 { step: EXERCISE_FREQUENCY, data: { frequency } }",
+        "提交成功后自动跳转到 /results",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 15,
       "passes": false,
@@ -674,6 +668,142 @@
     },
     {
       "id": "US-016",
+      "title": "结果页 — FREE 预览状态",
+      "description": "As a FREE user, I want to see my health assessment core metrics (BMI, calories, target date, weight loss estimate) with locked areas teasing the full report behind a paywall.",
+      "acceptanceCriteria": [
+        "/results page loads via GET /api/results and displays FREE state",
+        "4 metric cards visible: BMI with category, daily calorie recommendation, target date, estimated weight loss",
+        "Weight projection area shows frosted glass overlay with lock icon and CTA button: 解锁完整方案 — ¥99",
+        "Diet/exercise plan area shows frosted glass overlay with lock icon",
+        "Skeleton loading screen while API request is in flight",
+        "Mobile responsive layout (stacked cards on mobile)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "",
+      "retryCount": 0,
+      "bestEffort": false,
+      "evaluation": {
+        "functionality": {
+          "score": 0,
+          "threshold": 70,
+          "pass": false
+        },
+        "codeQuality": {
+          "score": 0,
+          "threshold": 60,
+          "pass": false
+        },
+        "designQuality": {
+          "score": 0,
+          "threshold": 65,
+          "pass": false
+        },
+        "productDepth": {
+          "score": 0,
+          "threshold": 50,
+          "pass": false
+        },
+        "overallScore": 0,
+        "overallPass": false,
+        "feedback": ""
+      }
+    },
+    {
+      "id": "US-017",
+      "title": "结果页 — 支付弹窗 + PREMIUM 完整报告",
+      "description": "As a user, I want to pay via a modal, see my subscription upgrade instantly, and view the full unlocked report with weight projection chart and personalized diet/exercise plan.",
+      "acceptanceCriteria": [
+        "Clicking CTA button opens PayModal with: ¥99 amount, confirm button, cancel button",
+        "Confirm calls POST /api/pay, on success closes modal and refreshes results showing PREMIUM data",
+        "Payment failure shows error message in modal with retry button",
+        "PREMIUM results: weight projection chart (pure CSS line chart or Chart.js), full weeklyProjection data",
+        "PREMIUM results: planDetails section with protein/carbs/fat breakdown (percentage + grams), exercise plan, daily tips",
+        "Page refresh maintains PREMIUM state (sessionId cookie persists)",
+        "Already PREMIUM users see full data immediately, no paywall",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "",
+      "retryCount": 0,
+      "bestEffort": false,
+      "evaluation": {
+        "functionality": {
+          "score": 0,
+          "threshold": 70,
+          "pass": false
+        },
+        "codeQuality": {
+          "score": 0,
+          "threshold": 60,
+          "pass": false
+        },
+        "designQuality": {
+          "score": 0,
+          "threshold": 65,
+          "pass": false
+        },
+        "productDepth": {
+          "score": 0,
+          "threshold": 50,
+          "pass": false
+        },
+        "overallScore": 0,
+        "overallPass": false,
+        "feedback": ""
+      }
+    },
+    {
+      "id": "US-018",
+      "title": "端到端流程串联与异常处理",
+      "description": "As a system, I need to ensure the complete user journey has no gaps or crashes, covering all error paths: skip steps, invalid data, duplicate payments, missing steps on complete, session loss.",
+      "acceptanceCriteria": [
+        "Full flow test: / → 5 steps → /results(FREE) → pay → /results(PREMIUM) with no errors",
+        "Progress recovery: fill 3 steps → close tab → reopen → auto-redirect to step 4",
+        "Skip-step test: direct visit /quiz/goals → redirect to earliest incomplete step",
+        "Boundary test: submit height:3000 → 400 VALIDATION_ERROR with field=height",
+        "Duplicate payment test: PREMIUM user calls /pay → 409 ALREADY_PREMIUM",
+        "Incomplete complete test: only 3 steps done, call /api/quiz/complete → 400 INCOMPLETE_QUIZ with missingSteps",
+        "No-session results test: returns 404",
+        "Typecheck + Lint pass"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "",
+      "retryCount": 0,
+      "bestEffort": false,
+      "evaluation": {
+        "functionality": {
+          "score": 0,
+          "threshold": 70,
+          "pass": false
+        },
+        "codeQuality": {
+          "score": 0,
+          "threshold": 60,
+          "pass": false
+        },
+        "designQuality": {
+          "score": 0,
+          "threshold": 65,
+          "pass": false
+        },
+        "productDepth": {
+          "score": 0,
+          "threshold": 50,
+          "pass": false
+        },
+        "overallScore": 0,
+        "overallPass": false,
+        "feedback": ""
+      }
+    },
+    {
+      "id": "US-019",
       "title": "部署与文档交付",
       "description": "As a developer, I need to deploy to Vercel with a public URL and deliver complete documentation: README, API docs, DB schema diagram, AI collaboration writeup, and cURL demo chain.",
       "acceptanceCriteria": [
@@ -686,7 +816,7 @@
         "AI-COLLABORATION.md covers 6 sections: database modeling, type generation, mock data, algorithm implementation, debugging iterations, collaborative documentation",
         "GitHub repository is public and accessible"
       ],
-      "priority": 16,
+      "priority": 19,
       "passes": false,
       "notes": "",
       "retryCount": 0,
