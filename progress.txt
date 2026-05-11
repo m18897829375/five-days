@@ -81,3 +81,28 @@ Started: Sun May 10 20:53:58     2026
   - 路由文件置于 `app/api/quiz/step/route.ts` 对应端点 `/api/quiz/step`
   - Upsert 使用复合唯一键 `where: { userId_step: { userId, step } }` 自动防重复
 ---
+
+## 2026-05-12T18:44:00Z - US-011 (retry 2)
+- 修复了 3 个代码质量问题并重新验证全部 AC：
+  - ring-4 动态类名 → 改用 `cn()` 辅助函数，所有 className 使用完整静态字符串
+  - STEP_ROUTE_MAP 去重 → 提取到 `lib/step-routes.ts`，page.tsx 和 middleware.ts 共享引用
+  - aria-label → 每个年龄按钮添加 `aria-label="选择 XX 岁 年龄段"`
+- 添加 `eslint.config.mjs`（ESLint 9 flat config + typescript-eslint）
+- 数据库从占位符 Supabase 迁移到本地 Docker PostgreSQL
+- POST /api/session → 201 ✅
+- POST /api/quiz/step (AGE_RANGE) → 200, nextStep: "GENDER" ✅
+- Middleware 无 cookie 访问 /quiz/gender → 307 重定向到 / ✅
+- Middleware 访问 / → Set-Cookie sessionId ✅
+- Typecheck: 主应用 0 错误 ✅
+- ESLint: 0 错误/0 警告 ✅
+- 文件变更：
+  - `app/page.tsx` — cn 辅助函数 + gradientClass 映射 + aria-label + 共享 STEP_ROUTE_MAP
+  - `middleware.ts` — 引用共享 STEP_ROUTE_MAP
+  - `lib/step-routes.ts` — 新建共享路由常量
+  - `eslint.config.mjs` — 新建 ESLint 9 flat config
+- **Learnings for future iterations:**
+  - Next.js 16 移除了 `next lint` 命令，需单独配置 ESLint
+  - Tailwind v3 JIT 扫描完整字符串，但用 cn() 辅助函数可提升可读性
+  - `@eslint/eslintrc` FlatCompat 在 ESLint 9 下有循环引用 bug，直接用 typescript-eslint 原生 flat config 更稳定
+  - 本地 Docker PostgreSQL 可替代 Supabase 进行开发验证
+---
