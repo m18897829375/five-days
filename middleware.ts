@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-
-const STEP_ROUTES: Record<string, string> = {
-  AGE_RANGE: "/",
-  GENDER: "/quiz/gender",
-  BODY_DATA: "/quiz/body",
-  GOALS: "/quiz/goals",
-  EXERCISE_FREQUENCY: "/quiz/exercise",
-}
+import { STEP_ROUTE_MAP } from "@/lib/step-routes"
 
 export async function middleware(request: NextRequest) {
   const { pathname, origin } = request.nextUrl
@@ -56,11 +49,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === "/results") {
-    const targetRoute = STEP_ROUTES[progress.currentStep || "AGE_RANGE"]
+    const targetRoute = STEP_ROUTE_MAP[progress.currentStep || "AGE_RANGE"]
     return NextResponse.redirect(new URL(targetRoute, request.url))
   }
 
-  const expectedRoute = STEP_ROUTES[progress.currentStep || "AGE_RANGE"]
+  const expectedRoute = STEP_ROUTE_MAP[progress.currentStep || "AGE_RANGE"]
   if (pathname !== expectedRoute) {
     return NextResponse.redirect(new URL(expectedRoute, request.url))
   }
