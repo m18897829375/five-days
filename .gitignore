@@ -16,6 +16,14 @@ node_modules/
 # TypeScript incremental build info
 tsconfig.tsbuildinfo
 
+# Test artifacts (cookies, headers, screenshots)
+cookie.txt
+headers.txt
+incomplete-cookie.txt
+premium-cookie.txt
+screenshot-home.png
+test-results/
+
 # OS files
 .DS_Store
 
