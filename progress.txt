@@ -222,3 +222,37 @@ Started: Sun May 10 20:53:58     2026
   - middleware matcher regex efficiently excludes api/_next routes
   - curl.exe JSON body requires bash on Windows (PowerShell curl = Invoke-WebRequest alias)
 ---
+
+## 2026-05-13T01:00:00Z - US-010 (build - retry after git rm)
+- 从零重新实现 US-010：middleware.ts + 3 个共享 UI 组件 + 首页占位
+- 文件变更：
+  - `middleware.ts` — 会话检测（无 cookie 时自动 POST /api/session 创建 + Set-Cookie），进度感知路由（GET /api/quiz/progress → STEP_ROUTE_MAP 重定向），已完成测评重定向到 /results。matcher 排除 api/_next 路由。API 5xx/网络错误时优雅降级（pass through）。
+  - `components/PageTransition.tsx` — "use client" Framer Motion AnimatePresence 包装器，fade+slide 动画，按 pathname 键控
+  - `components/ProgressBar.tsx` — "use client" 5 步进度指示器（年龄/性别/身体/目标/运动）。3 种视觉状态：已完成（✓+绿色背景）、当前（蓝色 ring-2）、未完成（灰色）。从 lib/quiz-steps.ts 读取步骤序列
+  - `components/StepPage.tsx` — "use client" 可复用问卷布局：max-w-lg 容器、ProgressBar、标题、children 插槽、可选继续按钮（含 loading/disabled 状态）
+  - `app/page.tsx` — "use client" 占位首页，使用 StepPage + ProgressBar，作为 AGE_RANGE 步骤入口
+  - `lib/quiz-steps.ts` — QUIZ_STEPS 常量数组（步骤 + 标签），与 STEP_ROUTE_MAP 关注点分离（一个管显示序列，一个管路由映射）
+  - `lib/utils.ts` — cn() classname 合并工具函数（与 US-011 模式一致）
+- app/layout.tsx 无需修改（PageTransition 导入路径匹配新组件）
+- 12 条验证步骤全部通过：
+  - VS1: 清空 cookie → 访问 / → Set-Cookie sessionId (httpOnly) ✅
+  - VS2/VS7: 首页 ProgressBar 5 步渲染，步骤 1 蓝色高亮 ✅
+  - VS3: 提交 AGE_RANGE → 访问 / → 307 重定向 /quiz/gender ✅
+  - VS4: 完成全部 5 步 → 访问 / → 307 重定向 /results ✅
+  - VS5: 已完成 session 访问 /quiz/gender → 307 重定向 /results ✅
+  - VS6: POST /api/session → 201，未被拦截 ✅
+  - VS8: 组件逻辑正确（currentStep 驱动三态渲染） ✅
+  - VS9: Framer Motion AnimatePresence 动画活跃（opacity+translateY 过渡） ✅
+  - VS10: StepPage 布局正确（title+children 渲染） ✅
+  - VS11: tsc --noEmit 0 错误 ✅
+  - VS12: eslint . 0 错误 0 警告 ✅
+- Pre-QA 自评全部通过
+- **Learnings for future iterations:**
+  - Next.js 16.2.6 提示 middleware 迁移至 proxy（目前仍可用，功能正常）
+  - middleware 中 fetch 内部 API 路由不会触发自身中间件（matcher 排除 /api/*）
+  - `cookies().set()` 在路由处理器中设置的 httpOnly cookie 无法通过浏览器 JS 读取
+  - Playwright `context.clearCookies()` + `context.cookies()` 可验证 httpOnly cookie
+  - lib/quiz-steps.ts（步骤→标签）与 lib/step-routes.ts（步骤→路由）关注点分离，不重复
+  - cn() 工具函数应从 lib/utils.ts 统一导入（与 US-011 以后的模式保持一致）
+  - middleware 的 fetch 到自身 API 需要传递 Cookie header 以维持 session 上下文
+---
