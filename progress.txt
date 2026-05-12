@@ -153,3 +153,26 @@ Started: Sun May 10 20:53:58     2026
   - .ralph/ 下的评估脚本会触发 ESLint，需加入 ignores
   - Dev server 端口被占时 Next.js 会自动切换端口
 ---
+
+## 2026-05-12T23:30:00Z - US-019 - 部署与文档交付
+- Vercel 部署成功：https://health-assessment-bay.vercel.app
+- Vercel 环境变量已配置：DATABASE_URL + DIRECT_URL (production)
+- README.md 补充真实预付费测试 sessionId：382b1e9a-42a1-4b7d-a854-cf4565666f7a
+- 修复 package.json 添加 postinstall 脚本（`prisma generate`）
+- 修复 app/api/quiz/complete/route.ts 隐式 any 类型（Vercel 构建失败）
+- 文件变更：
+  - `.gitignore` — 添加 `.vercel/` 忽略
+  - `package.json` — 添加 postinstall 脚本
+  - `README.md` — 替换占位符 sessionId 为真实值，新增直接复制命令
+  - `app/api/quiz/complete/route.ts` — 添加 import type { QuizStep } + 显式类型标注
+- tsc --noEmit: 0 错误
+- Vercel 构建: 通过（Prisma Client 生成 + TypeScript 检查 + 静态页面生成）
+- GitHub 仓库: PUBLIC
+- AI-COLLABORATION.md: 6 章节完整
+- **Learnings for future iterations:**
+  - Vercel 构建环境不会自动运行 `prisma generate`，需 postinstall 脚本
+  - Vercel 的 tsc 检查比本地更严格（可能因为 --strict 配置差异或缓存问题）
+  - `vercel env add` 需要 `--value` 参数（非交互模式）
+  - 本地 Docker PostgreSQL 可用于开发验证，生产需要云数据库（Supabase/Neon）
+  - Vercel CLI 在包含空格的目录名下自动生成项目名会失败，需手动 `vercel projects add`
+---
