@@ -197,3 +197,28 @@ Started: Sun May 10 20:53:58     2026
   - httpOnly cookie 无法通过浏览器 JS document.cookie 清除，需用 Playwright context.clearCookies()
   - 合同驱动开发: 先锁定 contract, 后验证实现，确保不偏离验收标准
 ---
+
+## 2026-05-12T23:00:00Z - US-010 (build - first build)
+- Implemented quiz framework: middleware (session/progress routing) + 3 shared UI components + placeholder home page
+- Files created:
+  - `middleware.ts` — Session detection (auto-create via POST /api/session when no cookie), progress-aware routing (GET /api/quiz/progress → STEP_ROUTE_MAP redirect), completed quiz redirect to /results. matcher excludes api/_next routes. Graceful degradation on API 5xx/network errors (pass through).
+  - `components/PageTransition.tsx` — "use client" Framer Motion AnimatePresence wrapper with fade+slide animation keyed by pathname.
+  - `components/ProgressBar.tsx` — "use client" 5-step progress indicator (年龄/性别/身体/目标/运动). 3 visual states: completed (checkmark+blue bg), current (blue-600 ring), upcoming (grey).
+  - `components/StepPage.tsx` — "use client" reusable quiz step layout: max-w-lg container, ProgressBar at top, title, children slot, optional continue button.
+  - `app/page.tsx` — "use client" minimal placeholder using StepPage + ProgressBar. Will be replaced by sub-stories.
+- All 13 verification steps passed:
+  - VS1: No cookie → Set-Cookie: sessionId=<uuid>
+  - VS4: Progress redirect to /quiz/gender (307)
+  - VS5-VS6: Completed quiz redirect to /results (307)
+  - VS7: ProgressBar renders 5 steps with correct states
+  - VS8: StepPage renders with max-w-lg layout
+  - VS9: AnimatePresence + Framer Motion present in DOM
+  - VS11: API routes not intercepted (POST /api/session → 201)
+  - tsc --noEmit: 0 errors, ESLint: 0 errors/warnings
+- Pre-QA: All passed (startup/AC testing/error states/typecheck/lint)
+- **Learnings:**
+  - "use client" required for components passing event handlers (onClick) to child elements
+  - .env.local empty DATABASE_URL overrides .env valid value (Next.js priority: .env.local > .env)
+  - middleware matcher regex efficiently excludes api/_next routes
+  - curl.exe JSON body requires bash on Windows (PowerShell curl = Invoke-WebRequest alias)
+---
