@@ -1,6 +1,7 @@
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import type { QuizStep } from "@prisma/client"
 import { calculateAll } from "@/lib/health"
 
 const VALID_STEPS = [
@@ -35,7 +36,7 @@ export async function POST() {
     orderBy: { createdAt: "asc" },
   })
 
-  const completedSteps = quizSteps.map((s) => s.step)
+  const completedSteps = quizSteps.map((s: QuizStep) => s.step)
   const missingSteps = VALID_STEPS.filter((s) => !completedSteps.includes(s))
 
   if (missingSteps.length > 0) {

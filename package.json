@@ -12,7 +12,8 @@
     "db:push": "npx prisma db push",
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
-    "vercel:deploy": "vercel --prod"
+    "vercel:deploy": "vercel --prod",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",

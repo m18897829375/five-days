@@ -32,3 +32,5 @@ test-results/
 !/.claude/settings.json.example
 # NEVER commit local settings (contains API keys)
 .claude/settings.local.json
+
+.vercel

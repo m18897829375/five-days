@@ -141,13 +141,20 @@ curl -s http://localhost:3000/api/test/premium-session | jq .
 返回示例：
 ```json
 {
-  "sessionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "sessionId": "382b1e9a-42a1-4b7d-a854-cf4565666f7a",
   "subscription": "PREMIUM",
-  "curlExample": "curl -s -b 'sessionId=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' http://localhost:3000/api/results | jq ."
+  "curlExample": "curl -s -b 'sessionId=382b1e9a-42a1-4b7d-a854-cf4565666f7a' http://localhost:3000/api/results | jq ."
 }
 ```
 
-复制返回的 `curlExample` 命令即可直接查看 PREMIUM 完整报告（体重预测趋势 + 蛋白质/碳水/脂肪营养方案 + 运动计划 + 每日建议）。
+复制返回的 `curlExample` 命令，或直接使用以下预付费测试 sessionId：
+
+```bash
+# 直接使用预付费测试会话查看完整 PREMIUM 报告
+curl -s -b 'sessionId=382b1e9a-42a1-4b7d-a854-cf4565666f7a' http://localhost:3000/api/results | jq .
+```
+
+此 sessionId 返回完整数据：体重预测趋势（weeklyProjection）+ 蛋白质/碳水/脂肪营养方案（planDetails）+ 运动计划 + 每日建议。
 
 ## 数据库关系图
 
