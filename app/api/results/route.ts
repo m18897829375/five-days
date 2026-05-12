@@ -8,16 +8,16 @@ export async function GET() {
 
   if (!sessionId) {
     return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "未找到会话" } },
-      { status: 401 },
+      { success: false, error: { code: "NOT_FOUND", message: "未找到会话" } },
+      { status: 404 },
     )
   }
 
   const user = await prisma.user.findUnique({ where: { sessionId } })
   if (!user) {
     return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "无效会话" } },
-      { status: 401 },
+      { success: false, error: { code: "NOT_FOUND", message: "无效会话" } },
+      { status: 404 },
     )
   }
 

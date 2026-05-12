@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
@@ -95,8 +95,6 @@ export default function ResultsPage() {
       if (!resResults.ok) {
         if (resResults.status === 404) {
           setError("请先完成测评再查看结果")
-        } else if (resResults.status === 401) {
-          setError("会话已过期，请返回首页重新开始")
         } else {
           setError(jsonResults.error?.message ?? "加载失败，请刷新重试")
         }
