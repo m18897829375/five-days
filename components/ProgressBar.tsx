@@ -1,12 +1,14 @@
 "use client"
 
-const STEPS = [
-  { key: "AGE_RANGE", label: "年龄范围" },
-  { key: "GENDER", label: "性别" },
-  { key: "BODY_DATA", label: "身体数据" },
-  { key: "GOALS", label: "目标" },
-  { key: "EXERCISE_FREQUENCY", label: "运动频率" },
-] as const
+const STEP_LABELS: Record<string, string> = {
+  AGE_RANGE: "年龄",
+  GENDER: "性别",
+  BODY_DATA: "身体",
+  GOALS: "目标",
+  EXERCISE_FREQUENCY: "运动",
+}
+
+const STEP_ORDER = ["AGE_RANGE", "GENDER", "BODY_DATA", "GOALS", "EXERCISE_FREQUENCY"]
 
 interface ProgressBarProps {
   currentStep: string
@@ -15,43 +17,55 @@ interface ProgressBarProps {
 
 export default function ProgressBar({ currentStep, completedSteps }: ProgressBarProps) {
   return (
-    <div className="flex items-center justify-center gap-1 sm:gap-2 px-4 py-6">
-      {STEPS.map((step, i) => {
-        const isCompleted = completedSteps.includes(step.key)
-        const isCurrent = step.key === currentStep
+    <div className="mb-6 flex items-center justify-between gap-1">
+      {STEP_ORDER.map((step, i) => {
+        const isCompleted = completedSteps.includes(step)
+        const isCurrent = step === currentStep
+        const label = STEP_LABELS[step] ?? step
 
         return (
-          <div key={step.key} className="flex items-center">
-            <div className="flex flex-col items-center">
+          <div key={step} className="flex flex-1 flex-col items-center gap-1">
+            <div className="flex w-full items-center">
+              {i > 0 && (
+                <div
+                  className={`h-0.5 flex-1 ${
+                    isCompleted || (completedSteps.includes(STEP_ORDER[i - 1]) && isCurrent)
+                      ? "bg-blue-500"
+                      : "bg-gray-200"
+                  }`}
+                />
+              )}
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+                className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
                   isCompleted
-                    ? "bg-green-500 text-white"
+                    ? "bg-blue-500 text-white"
                     : isCurrent
-                      ? "bg-blue-600 text-white ring-4 ring-blue-200"
-                      : "bg-gray-200 text-gray-400"
+                      ? "border-2 border-blue-500 bg-white text-blue-500"
+                      : "border-2 border-gray-200 bg-white text-gray-300"
                 }`}
+                aria-label={`${label}${isCompleted ? " 已完成" : isCurrent ? " 当前" : " 未开始"}`}
               >
                 {isCompleted ? "✓" : i + 1}
               </div>
-              <span
-                className={`mt-1 whitespace-nowrap text-xs ${
-                  isCurrent ? "font-semibold text-blue-700" : "text-gray-500"
-                }`}
-              >
-                {step.label}
-              </span>
+              {i < STEP_ORDER.length - 1 && (
+                <div
+                  className={`h-0.5 flex-1 ${
+                    isCompleted ? "bg-blue-500" : "bg-gray-200"
+                  }`}
+                />
+              )}
             </div>
-            {i < STEPS.length - 1 && (
-              <div
-                className={`mx-1 mb-5 h-0.5 w-6 sm:w-10 ${
-                  completedSteps.includes(STEPS[i + 1].key) ||
-                  (isCompleted && step.key === currentStep)
-                    ? "bg-green-500"
-                    : "bg-gray-200"
-                }`}
-              />
-            )}
+            <span
+              className={`text-xs font-medium ${
+                isCompleted
+                  ? "text-blue-500"
+                  : isCurrent
+                    ? "text-blue-600"
+                    : "text-gray-300"
+              }`}
+            >
+              {label}
+            </span>
           </div>
         )
       })}
