@@ -353,7 +353,7 @@
           "threshold": 50,
           "pass": true
         },
-        "overallScore": 83.0,
+        "overallScore": 83,
         "overallPass": true,
         "feedback": ""
       }
@@ -416,33 +416,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 73,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 82,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 74,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 60,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 72.3,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -460,33 +460,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 11,
-      "passes": true,
+      "passes": false,
       "notes": "",
-      "retryCount": 1,
+      "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 95,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 85,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 75,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 80,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 84.5,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -503,33 +503,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": "",
-      "retryCount": 1,
+      "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 85,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 78,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 72,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 75,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 78.1,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -548,33 +548,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 13,
-      "passes": true,
+      "passes": false,
       "notes": "",
-      "retryCount": 1,
+      "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 95,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 88,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 82,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 78,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 86.6,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -592,33 +592,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 14,
-      "passes": true,
+      "passes": false,
       "notes": "",
-      "retryCount": 1,
+      "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 95,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 92,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 88,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 85,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 90.5,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -636,33 +636,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 15,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 95,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 78,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 78,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 75,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 82.5,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -681,33 +681,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 16,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 90,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 78,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 82,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 78,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 82.6,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -727,33 +727,33 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 17,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 88,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 75,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 78,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 85,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 81.65,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
@@ -772,33 +772,33 @@
         "Typecheck + Lint pass"
       ],
       "priority": 18,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "retryCount": 0,
       "bestEffort": false,
       "evaluation": {
         "functionality": {
-          "score": 92,
+          "score": 0,
           "threshold": 70,
-          "pass": true
+          "pass": false
         },
         "codeQuality": {
-          "score": 78,
+          "score": 0,
           "threshold": 60,
-          "pass": true
+          "pass": false
         },
         "designQuality": {
-          "score": 68,
+          "score": 0,
           "threshold": 65,
-          "pass": true
+          "pass": false
         },
         "productDepth": {
-          "score": 80,
+          "score": 0,
           "threshold": 50,
-          "pass": true
+          "pass": false
         },
-        "overallScore": 80.1,
-        "overallPass": true,
+        "overallScore": 0,
+        "overallPass": false,
         "feedback": ""
       }
     },
