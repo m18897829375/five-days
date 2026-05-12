@@ -168,7 +168,7 @@ export default function ResultsPage() {
       </h1>
 
       {/* Metric Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <BMICard bmi={result.bmi} category={result.bmiCategory} />
         <MetricCard
           label="每日推荐"
@@ -233,7 +233,7 @@ function BMICard({ bmi, category }: { bmi: number; category: string }) {
   return (
     <div
       className={cn(
-        "col-span-2 rounded-2xl p-5",
+        "col-span-1 rounded-2xl p-5 sm:col-span-2",
         BMI_CATEGORY_BG[category] ?? "bg-gray-50"
       )}
     >
@@ -534,8 +534,8 @@ function Skeleton() {
     <div className="mx-auto max-w-lg animate-pulse px-4 py-8">
       <div className="mx-auto mb-8 h-8 w-48 rounded bg-gray-200" />
 
-      <div className="mb-6 grid grid-cols-2 gap-3">
-        <div className="col-span-2 rounded-2xl bg-gray-100 p-5">
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="col-span-1 rounded-2xl bg-gray-100 p-5 sm:col-span-2">
           <div className="mb-3 h-4 w-24 rounded bg-gray-200" />
           <div className="mb-2 h-10 w-20 rounded bg-gray-200" />
           <div className="h-6 w-12 rounded-full bg-gray-200" />
