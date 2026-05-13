@@ -32,6 +32,13 @@ export async function GET() {
     )
   }
 
+  const bodyDataStep = await prisma.quizStep.findUnique({
+    where: { userId_step: { userId: user.id, step: "BODY_DATA" } },
+  })
+  const bodyData = (bodyDataStep?.data as Record<string, unknown>) ?? {}
+  const currentWeight = (bodyData.currentWeight as number) ?? 0
+  const targetWeight = (bodyData.targetWeight as number) ?? 0
+
   const isPremium = user.subscription === "PREMIUM"
 
   const result = {
@@ -41,6 +48,8 @@ export async function GET() {
     tdee: healthResult.tdee,
     recommendedCalories: healthResult.recommendedCalories,
     targetDate: healthResult.targetDate.toISOString(),
+    currentWeight,
+    targetWeight,
     weeklyProjection: isPremium ? healthResult.weeklyProjection : null,
     planDetails: isPremium ? healthResult.planDetails : null,
     ...(isPremium ? {} : { lockMessage: "升级至PREMIUM解锁完整报告" }),
