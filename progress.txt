@@ -443,3 +443,27 @@ Started: Sun May 10 20:53:58     2026
   - ALREADY_PREMIUM 检查放在 amount 验证之前，确保已支付用户不会被误判为支付失败
   - 测试辅助端点 premium-session 复用 lib/health.ts calculateAll()，保持计算逻辑一致性
 ---
+
+## 2026-05-13T21:20:00Z - US-017 (build - first build)
+- Full code existed from prior implementation (commit 67059f6). This round: complete Pre-QA verification.
+- Found flow bug: exercise/page.tsx didn't call /api/quiz/complete after last step, so HealthResult was never created.
+- Fix: exercise/page.tsx calls POST /api/quiz/complete before navigating to /results when nextStep is null.
+- All 15 verification steps passed (Playwright browser test):
+  - VS1-5: FREE results display (4 MetricCard + weight projection FrostedOverlay with CTA + diet FrostedOverlay no CTA)
+  - VS6-7: PayModal Y1 + confirm/cancel + cancel returns to FREE
+  - VS8-10: Confirm payment -> PREMIUM WeightChart SVG (Y 81->71kg, X week2/4/6/8/10) + PlanDetails (protein 30% 169g / carbs 40% 225g / fat 30% 75g + exercise plan + 3 tips)
+  - VS11: Refresh preserves PREMIUM state
+  - VS12: Already-PREMIUM users see full data immediately (no overlay, no CTA)
+  - VS13: Payment failure "zhi fu shi bai qing chong shi" + retry button
+  - VS14-15: tsc --noEmit 0 errors / eslint . 0 errors 0 warnings
+- Files changed:
+  - pp/quiz/exercise/page.tsx - added /api/quiz/complete call (2 lines)
+- Pre-QA: all passed (startup/AC testing/error states/typecheck/lint)
+- **Learnings for future iterations:**
+  - Must call /api/quiz/complete before navigating to /results after last quiz step
+  - Playwright page.route() interception can simulate API failure for error UI verification
+  - httpOnly cookie management: context.addCookies() / context.clearCookies()
+  - CTA shows Y99 (marketing price), PayModal shows Y1 (actual payment) - per contract design
+  - US-018 needs end-to-end flow including error handling, this flow fix is prerequisite
+---
+
