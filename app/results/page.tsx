@@ -6,7 +6,24 @@ import { useRouter } from "next/navigation"
 import MetricCard from "@/components/MetricCard"
 import FrostedOverlay from "@/components/FrostedOverlay"
 import Skeleton from "@/components/Skeleton"
+import PayModal from "@/components/PayModal"
+import WeightChart from "@/components/WeightChart"
+import PlanDetails from "@/components/PlanDetails"
 import { cn } from "@/lib/utils"
+
+interface WeeklyProjectionItem {
+  week: number
+  weight: number
+  calories: number
+}
+
+interface PlanDetailsData {
+  protein: { percentage: number; grams: number }
+  carbs: { percentage: number; grams: number }
+  fat: { percentage: number; grams: number }
+  exercisePlan: string
+  tips: string[]
+}
 
 interface ResultsData {
   bmi: number
@@ -17,8 +34,8 @@ interface ResultsData {
   currentWeight: number
   targetWeight: number
   subscription: string
-  weeklyProjection: unknown
-  planDetails: unknown
+  weeklyProjection: WeeklyProjectionItem[] | null
+  planDetails: PlanDetailsData | null
   lockMessage?: string
 }
 
@@ -39,6 +56,7 @@ export default function ResultsPage() {
   const [data, setData] = useState<ResultsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ code?: string; message?: string } | null>(null)
+  const [showPayModal, setShowPayModal] = useState(false)
 
   async function fetchResults() {
     setLoading(true)
@@ -122,6 +140,7 @@ export default function ResultsPage() {
   if (!data) return null
 
   const weightChange = Math.abs(data.targetWeight - data.currentWeight).toFixed(1)
+  const isPremium = data.subscription === "PREMIUM"
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
@@ -150,19 +169,42 @@ export default function ResultsPage() {
         />
       </div>
 
-      {/* Weight projection placeholder */}
+      {/* Weight projection */}
       <div className="relative mt-6 bg-white rounded-xl border border-gray-100 p-6 min-h-48">
         <h2 className="text-lg font-semibold mb-4">体重预测</h2>
-        <p className="text-gray-400 text-sm">根据你的身体数据和目标，系统将生成每周体重变化趋势预测。</p>
-        <FrostedOverlay showCta ctaText="解锁完整方案 — ¥99" />
+        {isPremium && data.weeklyProjection ? (
+          <WeightChart data={data.weeklyProjection} />
+        ) : (
+          <>
+            <p className="text-gray-400 text-sm">根据你的身体数据和目标，系统将生成每周体重变化趋势预测。</p>
+            <FrostedOverlay showCta ctaText="解锁完整方案 — ¥99" onCtaClick={() => setShowPayModal(true)} />
+          </>
+        )}
       </div>
 
-      {/* Diet/exercise plan placeholder */}
+      {/* Diet/exercise plan */}
       <div className="relative mt-6 bg-white rounded-xl border border-gray-100 p-6 min-h-48">
         <h2 className="text-lg font-semibold mb-4">饮食与运动方案</h2>
-        <p className="text-gray-400 text-sm">解锁后将显示个性化每日营养配比、食谱建议和运动训练计划。</p>
-        <FrostedOverlay showCta={false} />
+        {isPremium && data.planDetails ? (
+          <PlanDetails data={data.planDetails} />
+        ) : (
+          <>
+            <p className="text-gray-400 text-sm">解锁后将显示个性化每日营养配比、食谱建议和运动训练计划。</p>
+            <FrostedOverlay showCta={false} />
+          </>
+        )}
       </div>
+
+      {/* Pay modal */}
+      {showPayModal && (
+        <PayModal
+          onClose={() => setShowPayModal(false)}
+          onSuccess={() => {
+            setShowPayModal(false)
+            fetchResults()
+          }}
+        />
+      )}
     </main>
   )
 }
