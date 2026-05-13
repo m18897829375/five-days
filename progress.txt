@@ -256,3 +256,34 @@ Started: Sun May 10 20:53:58     2026
   - cn() 工具函数应从 lib/utils.ts 统一导入（与 US-011 以后的模式保持一致）
   - middleware 的 fetch 到自身 API 需要传递 Cookie header 以维持 session 上下文
 ---
+
+## 2026-05-13T02:30:00Z - US-012 - Gender Selection Page — Male/Female Large Icon Buttons
+- 创建 app/quiz/gender/page.tsx，严格遵循 US-011 (app/page.tsx) 代码模式
+- 文件变更：
+  - `app/quiz/gender/page.tsx` — 新建，82 行。"use client" 性别选择页
+- 实现要点：
+  - 2 个大图标按钮：♂ 男性（蓝色渐变）+ ♀ 女性（粉色渐变）
+  - aria-label 无障碍属性（"选择男性"/"选择女性"）
+  - POST /api/quiz/step { step: "GENDER", data: { gender: "male"|"female" } }
+  - 成功后 STEP_ROUTE_MAP[data.nextStep] 动态跳转 → /quiz/body
+  - loading 态：选中按钮 ring-4 高亮 + 未选中 opacity-50 + 全部 disabled
+  - API 错误（!res.ok）：红色错误横幅 + 页面停留 + 按钮重新启用
+  - 网络故障（catch）：中文错误消息 + 页面停留
+  - 使用共享组件：StepPage (title="选择您的性别", currentStep="GENDER") + ProgressBar
+  - 导入 cn() 从 lib/utils.ts + STEP_ROUTE_MAP 从 lib/step-routes.ts
+  - 中间件无需修改（已处理 /quiz/gender 路由）
+- 验收测试全部通过：
+  - tsc --noEmit: 0 错误 / ESLint: 0 错误/0 警告
+  - 性别页面渲染 + aria-label 正确
+  - POST 请求体 { step: "GENDER", data: { gender: "male" } } 正确
+  - 成功跳转 /quiz/body（STEP_ROUTE_MAP 动态解析）
+  - API 500 错误横幅 + 页面停留 + 按钮重新启用
+  - 网络故障中文错误消息 + 页面停留
+  - 直接访问 /quiz/gender 无 cookie → 重定向到 /
+- Supabase 数据库不可达时使用 Playwright route interception 完成验证
+- **Learnings for future iterations:**
+  - Playwright page.route() 拦截器需 page.unrouteAll() 清理旧拦截器
+  - Middleware 服务端 fetch 无法被 Playwright 拦截，需手动设置 cookie 绕过
+  - US-011 模式可作为所有多选项步骤页面的模板
+  - ♂/♀ Unicode 符号在所有平台渲染一致
+---
