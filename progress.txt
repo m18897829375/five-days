@@ -287,3 +287,46 @@ Started: Sun May 10 20:53:58     2026
   - US-011 模式可作为所有多选项步骤页面的模板
   - ♂/♀ Unicode 符号在所有平台渲染一致
 ---
+
+## 2026-05-13T11:20:00Z - US-013 - 身体数据表单页 — 4 个数字输入
+- 创建 app/quiz/body/page.tsx: 受控表单，4 个数字输入（年龄/身高cm/当前体重kg/目标体重kg），每个带单位后缀
+- 使用 bodyDataSchema 进行前端 Zod 验证（提交时），Zod 4 错误消息转中文（"最小值为 X"/"最大值为 X"）
+- POST /api/quiz/step { step: "BODY_DATA", data: { age, height, currentWeight, targetWeight } }，数值类型（parseInt）
+- 成功后 STEP_ROUTE_MAP 动态跳转至 /quiz/goals
+- 以下遵循 US-011/US-012 代码模式：StepPage wrapper + ProgressBar（自动渲染）+ cn() 工具函数 + STEP_ROUTE_MAP 路由
+- 错误处理：API 错误 → 红色 banner + 按钮/输入重新启用；网络错误 → 中文消息 "网络请求失败，请检查网络连接后重试"
+- 加载态：按钮 "提交中..." disabled + 全部输入 disabled
+- 按钮初始 disabled（所有字段为空），输入数据后启用
+- 每个输入有 htmlFor/id 标签关联 + aria-label 无障碍属性
+- 文件变更：
+  - app/quiz/body/page.tsx — 新建，157 行
+- tsc --noEmit: 0 错误 / ESLint: 0 错误 0 警告
+- Pre-QA 自评: 全部 14 AC 通过
+- **Learnings for future iterations:**
+  - Zod 4 错误消息格式与 Zod 3 不同："Too small: expected number to be >=X" 而非 "Number must be greater than or equal to X"
+  - 正则匹配 `/(>=?)\s*(\d+)/` 同时兼容 Zod 3 和 Zod 4 两种格式
+  - Playwright `page.unrouteAll({ behavior: 'ignoreErrors' })` 用于清除旧拦截器
+  - 当中间件跟踪到步骤已完成时，直接访问已完成步骤的 URL 会被 307 重定向到下一步骤
+  - 未实现的下一步骤页面（/quiz/goals）显示 Next.js 404，但不影响导航验证
+---
+
+## 2026-05-13T12:05:00Z - US-014 - 目标选择页 — 多选卡片
+- 创建 app/quiz/goals/page.tsx（113 行），实现多选健身目标页面
+- 4 张可切换目标卡片：减重(⚖️)/塑形(💪)/增肌(🏋️)/保持健康(❤️)，各有对应渐变色背景
+- 选中卡片：蓝色 ring + 白色 ✓ 标记
+- 继续按钮：无目标选中时置灰禁用
+- POST /api/quiz/step { step: "GOALS", data: { goals: [...] } }
+- 成功后 STEP_ROUTE_MAP 动态跳转至 /quiz/exercise
+- 错误处理：API 500 → 红色横幅 "服务器内部错误" + 按钮重新启用；网络故障 → "网络请求失败，请检查网络连接后重试"
+- 遵循 US-011/US-012 模式：use client, StepPage wrapper, cn() utils, STEP_ROUTE_MAP routing, aria-label + aria-pressed 无障碍
+- 关键差异：toggle 交互（非单选自提交），需单独的继续按钮，按钮条件禁用
+- 文件变更：
+  - app/quiz/goals/page.tsx — 新建，113 行
+- tsc --noEmit: 0 错误 / ESLint: 0 错误 0 警告
+- Pre-QA 自评：全部 7 AC 通过
+- **Learnings for future iterations:**
+  - 多选 toggle 页面使用 Set<string> 状态 + Set 函数式更新模式，避免引用问题
+  - StepPage 内置的 onContinue 按钮不适用于有条件禁用场景（如不少于1个选中），应自己渲染按钮
+  - aria-pressed 属性对 toggle 按钮提供无障碍语义
+  - Playwright route.abort('failed') 模拟网络故障，route.fulfill({ status: 500 }) 模拟服务端错误
+---
