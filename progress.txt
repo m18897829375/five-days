@@ -330,3 +330,86 @@ Started: Sun May 10 20:53:58     2026
   - aria-pressed 属性对 toggle 按钮提供无障碍语义
   - Playwright route.abort('failed') 模拟网络故障，route.fulfill({ status: 500 }) 模拟服务端错误
 ---
+
+## 2026-05-13T13:00:00Z - US-015 - 运动频率选择页 — 5 级单选
+- 创建 app/quiz/exercise/page.tsx（155 行），实现运动频率单选页面
+- 5 个选项：sedentary(久坐🪑)/light(轻度🚶)/moderate(中度🏃)/active(活跃🚴)/very_active(非常活跃🏆)，各有中文标签和描述
+- 单选项：选中卡片 ring-4 ring-blue-500 高亮 + hover:scale-105，切换选项高亮移动
+- 继续按钮：无选择时置灰禁用（bg-gray-300），选择后启用（bg-blue-600）
+- POST /api/quiz/step { step: "EXERCISE_FREQUENCY", data: { frequency } }
+- EXERCISE_FREQUENCY 是最后一步，nextStep 为 null，代码显式处理 null → router.push("/results")
+- 错误处理：API 500 → 红色横幅 "服务器内部错误" + 按钮重新启用；网络故障 → "网络请求失败，请检查网络连接后重试"
+- 加载态：按钮 "提交中..." disabled + 全部卡片 disabled
+- 每个卡片带 aria-label 无障碍属性
+- 遵循 US-012 单选模式 + US-014 继续按钮模式：StepPage wrapper + cn() utils + STEP_ROUTE_MAP 路由
+- 文件变更：
+  - app/quiz/exercise/page.tsx — 新建，155 行
+- tsc --noEmit: 0 错误 / ESLint: 0 错误 0 警告
+- Pre-QA 自评：全部 12 AC 通过（Playwright 浏览器实测确认）
+- **Learnings for future iterations:**
+  - STEP_ROUTE_MAP 不含 /results 映射，最后一步需显式处理 nextStep:null → /results 跳转
+  - 单选项用 string | null 状态 + 继续按钮 disabled-when-null 模式，类似 US-014 的条件禁用逻辑
+  - Playwright page.route() 拦截 + 不 fulfill（挂起）可验证加载态（按钮 "提交中..." + 卡片 disabled）
+  - httpOnly cookie 通过 Playwright context.clearCookies() + context.cookies() 管理
+  - Middleware 需完成所有前置步骤才能访问 /quiz/exercise，否则自动重定向到最早未完成步骤
+---
+
+## 2026-05-13T13:43:00Z - US-016 (retry 2)
+- 修复首次构建的致命缺陷：创建 app/results/page.tsx 集成页面
+- 修改 GET /api/results 添加 currentWeight/targetWeight（从 BODY_DATA QuizStep 查询）
+- 文件变更：
+  - app/results/page.tsx — 新建，'use client' 页面
+  - app/api/results/route.ts — 添加 BODY_DATA 查询
+  - components/MetricCard.tsx / FrostedOverlay.tsx / Skeleton.tsx — 纳入提交
+- tsc --noEmit: 0 错误
+- Pre-QA 自评：全部 8 AC 通过（Playwright 浏览器实测确认）
+- **Learnings for future iterations:**
+  - [PIVOT] 首次构建缺集成页面，本次只创建 page.tsx 即修复全部问题
+  - HttpOnly cookie 需 Playwright context.addCookies() 设置
+  - BMI category 英文值需页面映射为中文
+  - GET /api/results 需联查 QuizStep BODY_DATA 获取体重数据
+
+## 2026-05-13T13:50:00Z - US-016 (retry 3 — verification round)
+- 第二轮 Evaluator 评估失败（overallScore: 25.35），根因仍为缺少 page.tsx（首次构建的组件和 API 路由完好但未集成）
+- 本轮确认 page.tsx 已存在且全部 AC 通过，执行完整 Pre-QA 自评：
+  - AC1: /results 页面可访问，显示 FREE 状态 ✅
+  - AC2: 4 张指标卡片（BMI 26.1 超重 / 每日摄入 2226 kcal/天 / 预计达成 2026年07月29日 / 体重变化 8kg）✅
+  - AC3: 体重预测毛玻璃覆盖层（backdrop-blur-md + 🔒 + "解锁完整方案 — ¥99" 按钮）✅
+  - AC4: 饮食方案毛玻璃覆盖层（backdrop-blur-md + 🔒，无 CTA 按钮）✅
+  - AC5: 骨架屏加载动画（animate-pulse rounded-lg bg-gray-200）在 API 响应前显示 ✅
+  - AC6: 移动端响应式（375px 视口卡片单列堆叠）✅
+  - AC7: 错误处理 — 无会话→重定向到/；未完成测评→"请先完成测评"+ 链接到/；网络错误→"加载失败，请重试"+ 重试按钮 ✅
+  - AC8: npx tsc --noEmit 0 错误 ✅
+  - CTA 按钮可点击且保持在同一页面（US-017 范围）✅
+- 文件无需修改（所有代码已在上轮提交中完成）
+- **Learnings for future iterations:**
+  - Evaluator 查看的是评估时的代码快照，不是最新提交 — 需要重新评估才能检测到修复
+  - 页面级错误处理需覆盖 3 种不同错误类型：会话缺失、未完成测评、网络故障
+---
+
+## 2026-05-13T14:56:00Z - US-016 (retry 3 — git rm 后从零重建)
+- 从零重建全部 5 个文件（上一轮代码被 `git rm` 提交删除）
+- 文件变更：
+  - `components/Skeleton.tsx` — 新建，animate-pulse 骨架屏占位组件
+  - `components/MetricCard.tsx` — 新建，指标卡片（label/value/unit/subtext + cn() className 合并）
+  - `components/FrostedOverlay.tsx` — 新建，毛玻璃覆盖层（backdrop-blur-md + lock icon + 可选 CTA 渐变按钮）
+  - `app/api/results/route.ts` — 新建，GET 端点。FREE/PREMIUM 数据区分返回，联查 BODY_DATA 获取体重数据
+  - `app/results/page.tsx` — 新建，'use client' 集成页面。4 MetricCard 响应式网格 + 2 FrostedOverlay 区域 + 加载骨架屏 + 3 种错误状态
+- `npx tsc --noEmit`: 0 错误
+- `npx eslint .`: 0 错误 0 警告
+- Pre-QA 自评：全部 14 条 AC 通过（Playwright 浏览器实测确认）
+  - AC1-AC5: 4 张指标卡片正确渲染（BMI 26.1 超重 / 2250 kcal/天 / 2026年07月29日 / 8.0 kg）
+  - AC6-AC7: 体重预测毛玻璃（backdrop-blur-md + 🔒 + "解锁完整方案 — ¥99"）+ 饮食方案毛玻璃（🔒 only）
+  - AC8: 骨架屏 6 个 animate-pulse 元素在 API 挂起时正确显示
+  - AC9: 移动端 375px 卡片单列堆叠（grid-cols-1）
+  - AC10-AC12: 3 种错误状态（404 "请先完成测评" + 链接 / 401 重定向 / 网络错误 + 重试按钮）全部正确
+  - AC13-AC14: TypeScript 0 错误 / ESLint 0 错误 0 警告
+- CTA 按钮可点击且保持在同一页面（US-017 范围）
+- **Learnings for future iterations:**
+  - FrostedOverlay 的 `absolute inset-0` 要求父容器设置 `position: relative`
+  - BMI category 英文值（underweight/normal/overweight/obese）需在页面组件映射为中文
+  - GET /api/results 需额外查询 BODY_DATA QuizStep 获取 currentWeight/targetWeight（不在 HealthResult 表中）
+  - HttpOnly cookie 通过 Playwright context.addCookies() 设置，context.clearCookies() 清除
+  - 页面级错误处理需区分 3 种场景：401（redirect）、404（message + link）、network error（retry button）
+  - Contract 驱动的开发确保不遗漏验收标准，尤其错误处理
+---
