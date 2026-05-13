@@ -413,3 +413,33 @@ Started: Sun May 10 20:53:58     2026
   - 页面级错误处理需区分 3 种场景：401（redirect）、404（message + link）、network error（retry button）
   - Contract 驱动的开发确保不遗漏验收标准，尤其错误处理
 ---
+
+## 2026-05-13T14:50:00Z - US-017 - 支付弹窗 + PREMIUM 完整报告
+- 实现了支付弹窗、POST /api/pay 端点、PREMIUM 完整数据展示（体重纯 CSS SVG 折线图 + 营养素分解 + 运动计划 + 每日建议）
+- 文件变更：
+  - `app/api/pay/route.ts` — 新建，POST 端点。sessionId 鉴权 → ALREADY_PREMIUM 409 → amount≤0 模拟失败（PAYMENT_FAILED + PaymentRecord FAILED）→ 成功（UPDATE User + INSERT PaymentRecord COMPLETED）
+  - `app/api/test/premium-session/route.ts` — 新建，GET 端点。创建 PREMIUM User + 5 步测验数据 + calculateAll() 生成 HealthResult，返回 sessionId + curl 示例
+  - `components/PayModal.tsx` — 新建，"use client" 支付弹窗。¥1 金额 + 确认/取消 + loading 态 + 错误消息 + 重试按钮
+  - `components/WeightChart.tsx` — 新建，纯 CSS SVG 折线图。Y 轴刻度自动计算 + 渐变填充 + X 轴周标签 + 响应式（viewBox + w-full h-auto）
+  - `components/PlanDetails.tsx` — 新建，营养素分解（蛋白质/碳水/脂肪 百分比+克数 进度条）+ 运动计划文本 + 每日建议列表（3 条 bullet）
+  - `app/results/page.tsx` — 修改，集成 PayModal + PREMIUM 条件渲染。isPremium 判断 → PREMIUM 渲染 WeightChart+PlanDetails / FREE 渲染 FrostedOverlay。onCtaClick → 打开 PayModal，onSuccess → 关闭弹窗 + fetchResults() 刷新
+- `npx tsc --noEmit`: 0 错误
+- `npx eslint .`: 0 错误 0 警告
+- Pre-QA 自评：全部 9 条 AC 通过（Playwright 浏览器实测确认）
+  - AC1: PayModal ¥1 + 确认/取消 ✅
+  - AC2: 确认支付 → POST /api/pay → 成功关闭弹窗 + 刷新 PREMIUM 数据 ✅
+  - AC3: 支付失败 → 错误消息 "支付失败，请重试" + 重试按钮 ✅
+  - AC4: PREMIUM 体重预测 SVG 折线图（Y 轴 81→71kg，X 轴 第2/4/6/8/10周）✅
+  - AC5: PREMIUM 营养素分解（蛋白质 30% 169g / 碳水 40% 225g / 脂肪 30% 75g）+ 运动计划 + 3 条建议 ✅
+  - AC6: 页面刷新 PREMIUM 状态保持（sessionId cookie 持久化）✅
+  - AC7: 已 PREMIUM 用户直接看到完整数据，无支付墙（无毛玻璃/无 CTA）✅
+  - AC8: Typecheck 0 错误 ✅
+  - AC9: 浏览器实测：PREMIUM 直接访问、FREE→支付→PREMIUM、取消支付、支付失败+重试、移动端 375px 响应式 ✅
+- 额外验证：409 ALREADY_PREMIUM（已支付用户再次请求）、GET /api/test/premium-session 创建测试会话
+- **Learnings for future iterations:**
+  - 纯 CSS SVG 折线图：viewBox + w-full h-auto 实现响应式，linearGradient 填充区域，无需引入 Chart.js 运行时依赖
+  - PayModal 使用 fixed inset-0 + z-50 + backdrop-blur-sm 实现全屏遮罩弹窗，点击外部区域不会关闭（需显式取消/确认）
+  - onSuccess 回调中调用 fetchResults() 重新拉取 API，利用 sessionId cookie 获取更新后的 PREMIUM 数据
+  - ALREADY_PREMIUM 检查放在 amount 验证之前，确保已支付用户不会被误判为支付失败
+  - 测试辅助端点 premium-session 复用 lib/health.ts calculateAll()，保持计算逻辑一致性
+---
