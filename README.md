@@ -50,7 +50,7 @@ npm run dev
 | GET | `/api/quiz/progress` | 查询当前进度 | sessionId Cookie |
 | POST | `/api/quiz/complete` | 完成测评并计算 | sessionId Cookie |
 | GET | `/api/results` | 获取差异化结果 | sessionId Cookie |
-| POST | `/api/pay` | 模拟支付 ¥99 | sessionId Cookie |
+| POST | `/api/pay` | 模拟支付 ¥1 | sessionId Cookie |
 | GET | `/api/test/premium-session` | 生成预付费测试会话 | 无 |
 
 ### 响应格式
@@ -120,10 +120,10 @@ curl -s -b cookie.txt -X POST $BASE/api/quiz/complete | jq .
 # 9. 查看 FREE 结果（模糊化展示）
 curl -s -b cookie.txt $BASE/api/results | jq .
 
-# 10. 支付 ¥99 解锁完整报告
+# 10. 支付 ¥1 解锁完整报告
 curl -s -b cookie.txt -X POST $BASE/api/pay \
   -H "Content-Type: application/json" \
-  -d '{"amount":99}' | jq .
+  -d '{"amount":1}' | jq .
 
 # 11. 查看 PREMIUM 完整结果（含体重预测 + 营养方案）
 curl -s -b cookie.txt $BASE/api/results | jq .

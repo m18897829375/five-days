@@ -570,3 +570,24 @@ Started: Sun May 10 20:53:58     2026
   - fetch 后的响应检查是前端错误处理的最低要求——不检查就跳转等于吞掉所有错误
   - 中间件的进度感知重定向（GET /api/quiz/progress → STEP_ROUTE_MAP）是简洁可靠的路由守卫模式
 
+---
+
+## 2026-05-14T12:03:00Z - US-019 — 部署与文档交付
+- Vercel 生产部署成功：https://health-assessment-bay.vercel.app
+- Vercel 环境变量已配置：DATABASE_URL + DIRECT_URL (Production, Encrypted)
+- README.md 修复 3 处支付金额引用（¥99 → ¥1）：API 表格行、cURL 演示链注释、请求体 amount 值
+- All 11-command cURL demo chain verified: session→step×5→complete→results→pay→results，全部返回 success:true
+- 文件变更：
+  - `README.md` — 修复支付金额引用（¥99 → ¥1），共 3 处
+- tsc --noEmit: 0 错误
+- ESLint: 0 错误 0 警告
+- GitHub 仓库: PUBLIC
+- AI-COLLABORATION.md: 6 章节完整（Database Modeling / Type Generation / Mock Data / Algorithm Implementation / Debugging Iterations / Collaborative Documentation）
+- Pre-QA 自评：全部 10 AC + 11 VS 通过
+- **Learnings for future iterations:**
+  - 这是最后一个故事（US-019），全部 19 个用户故事均已完成（passes: true）
+  - Vercel 部署需 postinstall 脚本（prisma generate），否则构建时 Prisma Client 未生成
+  - `vercel --prod` 自动检测 Next.js 并使用最优构建配置
+  - cURL 演示链是验证生产部署最有效的方式——快速、精确、可重复
+  - 全链路测试（session→step×5→complete→results→pay→results）覆盖所有 API 端点
+
