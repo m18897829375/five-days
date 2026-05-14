@@ -81,7 +81,7 @@ npm run dev
 以下 11 条命令完成从创建会话到查看 PREMIUM 结果的完整流程：
 
 ```bash
-BASE="http://localhost:3000"
+BASE="https://health-assessment-bay.vercel.app"
 
 # 1. 创建匿名会话
 curl -s -c cookie.txt -X POST $BASE/api/session | jq .
@@ -135,7 +135,7 @@ curl -s -b cookie.txt $BASE/api/results | jq .
 
 ```bash
 # 生成 PREMIUM 测试会话（含完整测评数据）
-curl -s http://localhost:3000/api/test/premium-session | jq .
+curl -s https://health-assessment-bay.vercel.app/api/test/premium-session | jq .
 ```
 
 返回示例：
@@ -143,7 +143,7 @@ curl -s http://localhost:3000/api/test/premium-session | jq .
 {
   "sessionId": "382b1e9a-42a1-4b7d-a854-cf4565666f7a",
   "subscription": "PREMIUM",
-  "curlExample": "curl -s -b 'sessionId=382b1e9a-42a1-4b7d-a854-cf4565666f7a' http://localhost:3000/api/results | jq ."
+  "curlExample": "curl -s -b 'sessionId=382b1e9a-42a1-4b7d-a854-cf4565666f7a' https://health-assessment-bay.vercel.app/api/results | jq ."
 }
 ```
 
@@ -151,7 +151,7 @@ curl -s http://localhost:3000/api/test/premium-session | jq .
 
 ```bash
 # 直接使用预付费测试会话查看完整 PREMIUM 报告
-curl -s -b 'sessionId=382b1e9a-42a1-4b7d-a854-cf4565666f7a' http://localhost:3000/api/results | jq .
+curl -s -b 'sessionId=382b1e9a-42a1-4b7d-a854-cf4565666f7a' https://health-assessment-bay.vercel.app/api/results | jq .
 ```
 
 此 sessionId 返回完整数据：体重预测趋势（weeklyProjection）+ 蛋白质/碳水/脂肪营养方案（planDetails）+ 运动计划 + 每日建议。
