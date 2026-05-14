@@ -1,0 +1,14 @@
+CREATE SCHEMA IF NOT EXISTS "public";
+CREATE TYPE "subscription" AS ENUM ('FREE', 'PREMIUM');
+CREATE TYPE "quiz_step" AS ENUM ('AGE_RANGE', 'GENDER', 'BODY_DATA', 'GOALS', 'EXERCISE_FREQUENCY');
+CREATE TYPE "payment_status" AS ENUM ('COMPLETED', 'FAILED');
+CREATE TABLE "users" ("id" TEXT NOT NULL, "sessionId" TEXT NOT NULL, "subscription" "subscription" NOT NULL DEFAULT 'FREE', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "users_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "users_sessionId_key" ON "users"("sessionId");
+CREATE TABLE "quiz_steps" ("id" TEXT NOT NULL, "step" "quiz_step" NOT NULL, "data" JSONB NOT NULL, "userId" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "quiz_steps_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "quiz_steps_userId_step_key" ON "quiz_steps"("userId", "step");
+CREATE TABLE "health_results" ("id" TEXT NOT NULL, "userId" TEXT NOT NULL, "bmi" DOUBLE PRECISION NOT NULL, "bmiCategory" TEXT NOT NULL, "bmr" DOUBLE PRECISION NOT NULL, "tdee" DOUBLE PRECISION NOT NULL, "recommendedCalories" INTEGER NOT NULL, "targetDate" TIMESTAMP(3) NOT NULL, "weeklyProjection" JSONB NOT NULL, "planDetails" JSONB NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "health_results_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "health_results_userId_key" ON "health_results"("userId");
+CREATE TABLE "payment_records" ("id" TEXT NOT NULL, "userId" TEXT NOT NULL, "amount" INTEGER NOT NULL, "status" "payment_status" NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "payment_records_pkey" PRIMARY KEY ("id"));
+ALTER TABLE "quiz_steps" ADD CONSTRAINT "quiz_steps_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "health_results" ADD CONSTRAINT "health_results_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "payment_records" ADD CONSTRAINT "payment_records_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

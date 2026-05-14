@@ -591,3 +591,60 @@ Started: Sun May 10 20:53:58     2026
   - cURL 演示链是验证生产部署最有效的方式——快速、精确、可重复
   - 全链路测试（session→step×5→complete→results→pay→results）覆盖所有 API 端点
 
+## 2026-05-14 - US-020
+- Updated README.md cURL demo chain: replaced all `http://localhost:3000` with `https://health-assessment-bay.vercel.app`
+- 4 line changes: BASE variable (line 84), premium-session curl (line 138), curlExample JSON field (line 146), pre-paid session curl (line 154)
+- All 11 cURL commands verified against production URL — each returns success:true
+- FREE vs PREMIUM differentiation confirmed: FREE has weeklyProjection:null + lockMessage, PREMIUM has full weeklyProjection array + planDetails
+- **Learnings for future iterations:**
+  - Production curl verification is fast, precise, and repeatable — ideal for README validation
+  - Hardcoded test sessionId from local DB won't work in production (US-021 scope)
+  - README-only changes don't need typecheck but running it is free and confirms no accidental file changes
+---
+
+## 2026-05-14 - US-021 - 生产数据库预付费测试 sessionId 更新
+- 将 README.md 中硬编码的预付费测试 sessionId 替换为生产数据库真实值
+- 3 处修改：line 144（JSON 示例 sessionId）、line 146（curlExample JSON 字段）、line 154（curl 命令）
+- Cookie 格式从 `-b 'sessionId=...'` 改为 `-H 'Cookie: sessionId=...'` 跨平台兼容写法
+- 生产 API 验证通过：subscription=PREMIUM, weeklyProjection=11项, planDetails=完整, lockMessage=null
+- 文件变更：
+  - README.md — 3 insertions, 3 deletions
+- **Learnings for future iterations:**
+  - `-H 'Cookie: sessionId=...'` 比 `-b 'sessionId=...'` 跨平台兼容性更好（PowerShell curl 不支持 -b）
+  - 生产 sessionId 需来自生产数据库真实数据，本地 Docker sessionId 在线上无效
+---
+
+
+## 2026-05-15 - US-022 - 端到端线上验证
+- 纯验证故事，无代码变更。对生产部署 https://health-assessment-bay.vercel.app 执行了完整端到端验证。
+- **Browser (Playwright) 验证：**
+  - 首页加载正常，4 张年龄卡片 + 进度条 1/5
+  - 5 步问卷全部走通：年龄(30-39) → 性别(男) → 身体数据 → 目标(减重) → 运动(中度) → /results
+  - FREE 结果页：4 指标卡片 + 体重预测🔒 + 饮食方案🔒 + "解锁完整方案 — ¥1" 按钮
+  - 支付弹窗：标题"解锁完整报告"，金额 ¥1，确认支付/取消按钮
+  - PAY ¥1 后刷新显示 PREMIUM：体重预测折线图 + 营养素分解(蛋白质30%166g/碳水40%221g/脂肪30%74g) + 运动计划 + 3 条每日建议
+  - Mobile 375px 视口：布局正常堆叠
+  - Console 仅 favicon.ico 404（非功能性错误）
+- **cURL 链验证（两次独立测试）：**
+  - 第 1 次：分步执行 11 条命令，全部返回 success:true
+  - 第 2 次：README.md 代码块整体复制粘贴到 bash，11 条命令一次执行，全部返回 success:true
+  - FREE 结果：weeklyProjection=null, planDetails=null, lockMessage="解锁完整报告查看详细数据"
+  - PREMIUM 结果：weeklyProjection 14 周数据, planDetails 完整(protein/carbs/fat/exercisePlan/tips)
+- **预付费会话验证：**
+  - GET /api/test/premium-session 返回 {sessionId, subscription:PREMIUM, curlExample}
+  - 预付费 sessionId (e83bb9d8-825f-4317-b204-855dcac495ba) 直接返回 subscription:PREMIUM + 完整 weeklyProjection + planDetails
+- **AC 验证结果：7/7 全部通过**
+  - AC1: 浏览器完成 5 步问卷
+  - AC2: FREE 脱敏状态 + 付费弹窗
+  - AC3: 支付 ¥1 后 PREMIUM 完整报告
+  - AC4: 11 条 cURL 主链 success:true
+  - AC5: premium-session 返回 sessionId/subscription/curlExample
+  - AC6: 预付费 sessionId 返回 PREMIUM 完整数据
+  - AC7: README cURL 代码块单次复制粘贴可执行
+- **Edge Cases 覆盖：** 生产站点可达 / jq 已安装 / Mobile 375px 布局正常 / 支付一次成功无需重试
+- **Learnings for future iterations:**
+  - Playwright MCP 与 bash curl 并行执行可大幅提高验证效率
+  - 代码块复制粘贴测试需要确保环境中 bash 可用（Windows 需 Git Bash/MSYS2）
+  - 生产验证应包含 FREE→PAY→PREMIUM 完整闭环，不只测单个端点
+  - favicon.ico 404 在生产环境是正常现象，不应被视为错误
+---

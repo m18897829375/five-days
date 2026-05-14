@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "playwright": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"],
-      "description": "Playwright MCP server for browser automation testing. Required by Ralph Evaluator to test UI features in a real browser.",
+      "type": "http",
+      "url": "http://localhost:8931/mcp",
+      "description": "Playwright MCP server for browser automation testing. HTTP transport avoids MSYS2 stdio pipe deadlock with large screenshots.",
       "env": {}
     },
     "context7": {
