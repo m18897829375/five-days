@@ -1,5 +1,6 @@
 "use client"
 
+import { AlertTriangle } from "lucide-react"
 import { useEffect } from "react"
 
 export default function Error({
@@ -15,7 +16,7 @@ export default function Error({
 
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-4 py-8">
-      <div className="mb-4 text-5xl">⚠️</div>
+      <AlertTriangle className="mb-4 h-12 w-12 text-blue-600" />
       <h2 className="mb-2 text-xl font-semibold text-gray-900">出错了</h2>
       <p className="mb-6 text-center text-gray-500">
         页面加载失败，请稍后重试

@@ -80,6 +80,8 @@ npm run dev
 
 以下 11 条命令完成从创建会话到查看 PREMIUM 结果的完整流程：
 
+> 提示：`| jq .` 仅用于格式化 JSON 输出，如未安装 jq 可省略管道部分（如 `curl -s -c cookie.txt -X POST $BASE/api/session`）。
+
 ```bash
 BASE="https://health-assessment-bay.vercel.app"
 
