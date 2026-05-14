@@ -88,8 +88,13 @@ export default function ExercisePage() {
       if (route) {
         router.push(route)
       } else {
-        // Last step — complete the quiz to generate HealthResult
-        await fetch("/api/quiz/complete", { method: "POST" })
+        const completeRes = await fetch("/api/quiz/complete", { method: "POST" })
+        const completeData = await completeRes.json()
+        if (!completeRes.ok || !completeData.success) {
+          setError(completeData.error?.message || "提交失败，请重试")
+          setSubmitting(false)
+          return
+        }
         router.push("/results")
       }
     } catch {
