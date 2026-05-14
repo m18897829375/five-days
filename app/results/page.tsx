@@ -177,7 +177,7 @@ export default function ResultsPage() {
         ) : (
           <>
             <p className="text-gray-400 text-sm">根据你的身体数据和目标，系统将生成每周体重变化趋势预测。</p>
-            <FrostedOverlay showCta ctaText="解锁完整方案 — ¥99" onCtaClick={() => setShowPayModal(true)} />
+            <FrostedOverlay showCta ctaText="解锁完整方案 — ¥1" onCtaClick={() => setShowPayModal(true)} />
           </>
         )}
       </div>
