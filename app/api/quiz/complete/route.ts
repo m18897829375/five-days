@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { QuizStep } from "@prisma/client"
 import { calculateAll } from "@/lib/health"
+import { bodyDataSchema } from "@/lib/schemas"
 
 const VALID_STEPS = [
   "AGE_RANGE",
@@ -71,10 +72,18 @@ export async function POST() {
     Object.assign(data, step.data as Record<string, unknown>)
   }
 
-  const age = data.age as number
-  const height = data.height as number
-  const currentWeight = data.currentWeight as number
-  const targetWeight = data.targetWeight as number
+  const parsed = bodyDataSchema.safeParse(data)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { success: false, error: { code: "INVALID_BODY_DATA", message: "身体数据校验失败" } },
+      { status: 400 },
+    )
+  }
+
+  const age = parsed.data.age
+  const height = parsed.data.height
+  const currentWeight = parsed.data.currentWeight
+  const targetWeight = parsed.data.targetWeight
   const gender = data.gender as string
   const goals = data.goals as string[]
   const frequency = data.frequency as string
