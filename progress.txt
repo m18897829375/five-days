@@ -467,3 +467,58 @@ Started: Sun May 10 20:53:58     2026
   - US-018 needs end-to-end flow including error handling, this flow fix is prerequisite
 ---
 
+## 2026-05-14T05:15:00Z - US-017 (build — contract-locked verification)
+- Contract status: locked (score 87). All code from prior implementation (commit b9dc198). Re-verified all 15 verification steps.
+- Fix: CTA button text changed from "解锁完整方案 — ¥99" to "解锁完整方案 — ¥1" to match contract VS5 exactly.
+- Files changed:
+  - `app/results/page.tsx` — CTA text fix (1 line)
+- Pre-QA self-check: all 15 verification steps passed (Playwright browser verification)
+  - VS1: Dev server started ✅
+  - VS2: PREMIUM test session created via GET /api/test/premium-session ✅
+  - VS3: PREMIUM view — 4 MetricCards + WeightChart SVG (Y 81→71kg, X 第2/4/6/8/10周) + PlanDetails (protein 30%169g/carbs 40%225g/fat 30%75g + exercise + 3 tips) + NO FrostedOverlay/CTA ✅
+  - VS4: FREE session created (5 steps + complete) ✅
+  - VS5: FREE view — 4 MetricCards + weight FrostedOverlay (🔒 + "解锁完整方案 — ¥1") + diet FrostedOverlay (🔒 only, no CTA) ✅
+  - VS6: PayModal opened — ¥1 + "确认支付" + "取消" + backdrop blur ✅
+  - VS7: Cancel → modal closes, FREE state unchanged ✅
+  - VS8: Confirm → POST /api/pay → success → modal closes → PREMIUM data displayed ✅
+  - VS9: Page refresh → PREMIUM state persists (sessionId cookie) ✅
+  - VS10: Payment failure → "支付失败，请重试" + retry button ✅
+  - VS11: Retry → payment success → PREMIUM data ✅
+  - VS12: Already PREMIUM → full data immediately (no paywall) ✅
+  - VS13: Loading skeleton — code verified (page.tsx:94-106 renders Skeleton components during loading) ✅
+  - VS14: No quiz → "请先完成测评" + "开始测评" link to / ✅
+  - VS15: tsc --noEmit 0 errors, eslint . 0 errors 0 warnings ✅
+- Console errors: 0
+- **Learnings for future iterations:**
+  - Contract-locked verification steps must be followed exactly — CTA text discrepancy (¥99 vs ¥1) would cause evaluator deduction
+  - Playwright page.route() interception with fulfill() works for simulating API failures
+  - page.unrouteAll({ behavior: 'ignoreErrors' }) needed to remove interceptors before retry test
+  - httpOnly cookie management via context.addCookies() is essential for session-based testing
+  - US-018 (end-to-end flow) is the next story — all US-017 prerequisites are now complete
+---
+
+## 2026-05-14T07:15:00Z - US-017 (build — full re-verification)
+- Contract status: locked (score 87). All code already committed (b9dc198 + 9b607d3). This round: complete Pre-QA re-verification.
+- No code changes needed — all 15 verification steps passed with Playwright browser + curl API tests:
+  - VS1: Dev server started (npm run dev, Next.js 16.2.6, port 3000) ✅
+  - VS2-VS3: PREMIUM test session → /results shows 4 MetricCards (BMI 26.1 超重 / 2250 kcal/天 / 2026年07月30日 / 8.0 kg) + WeightChart SVG (Y 81→71kg, X 第2/4/6/8/10周) + PlanDetails (protein 30%169g/carbs 40%225g/fat 30%75g + exercise + 3 tips) + NO FrostedOverlay ✅
+  - VS4-VS5: FREE session (5 steps + complete) → /results shows 4 MetricCards + weight FrostedOverlay (🔒 + "解锁完整方案 — ¥1" CTA) + diet FrostedOverlay (🔒 only, no CTA) ✅
+  - VS6-VS7: PayModal opens with ¥1 + "确认支付" + "取消" + backdrop blur; cancel → modal closes, FREE state unchanged ✅
+  - VS8: Confirm → POST /api/pay (200) → modal closes → PREMIUM WeightChart + PlanDetails displayed, no FrostedOverlay ✅
+  - VS9: Page refresh (F5) → PREMIUM data persists (sessionId cookie remains) ✅
+  - VS10: Playwright route interception simulates API 402 → "支付失败，请重试" error + retry button in modal, user stays FREE ✅
+  - VS11: Retry with interceptor removed → payment succeeds → PREMIUM data displayed ✅
+  - VS12: Already-PREMIUM session → full data immediately, no paywall, no overlay, no CTA ✅
+  - VS13: API blocked → 6 animate-pulse skeleton elements render (4 cards + 2 sections) ✅
+  - VS14: No-quiz session → "请先完成测评" message + "开始测评" link to / ✅
+  - VS15: npx tsc --noEmit 0 errors; npx eslint . 0 errors 0 warnings ✅
+- Console errors: 0 (only expected 402 from simulated failure, no unexpected errors)
+- All API tests pass: 401 (no session), 409 (already premium), 402 (amount=0 failure), 200 (payment success)
+- **Learnings for future iterations:**
+  - Playwright context.addCookies() required for httpOnly cookie testing in browser
+  - page.route() interception with fulfill() simulates API failures effectively
+  - page.unrouteAll({ behavior: 'ignoreErrors' }) needed before retry tests
+  - API-level curling first catches data issues (wrong goal enum values) before browser testing
+  - US-018 (end-to-end flow + error handling) is the final remaining story
+---
+
