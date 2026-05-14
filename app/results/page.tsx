@@ -177,7 +177,7 @@ export default function ResultsPage() {
         ) : (
           <>
             <p className="text-gray-400 text-sm">根据你的身体数据和目标，系统将生成每周体重变化趋势预测。</p>
-            <FrostedOverlay showCta ctaText="解锁完整方案 — ¥1" onCtaClick={() => setShowPayModal(true)} />
+            <FrostedOverlay showCta ctaText="解锁完整方案 — ¥1" onCtaClick={() => setShowPayModal(true)} lockMessage={data.lockMessage} />
           </>
         )}
       </div>
@@ -190,7 +190,7 @@ export default function ResultsPage() {
         ) : (
           <>
             <p className="text-gray-400 text-sm">解锁后将显示个性化每日营养配比、食谱建议和运动训练计划。</p>
-            <FrostedOverlay showCta={false} />
+            <FrostedOverlay showCta={false} lockMessage={data.lockMessage} />
           </>
         )}
       </div>
