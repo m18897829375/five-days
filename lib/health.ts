@@ -18,10 +18,10 @@ export function calculateBMI(weightKg: number, heightCm: number) {
   const bmi = Math.round((weightKg / (heightM * heightM)) * 100) / 100
 
   let category: string
-  if (bmi < 18.5) category = "underweight"
-  else if (bmi < 25) category = "normal"
-  else if (bmi < 30) category = "overweight"
-  else category = "obese"
+  if (bmi < 18.5) category = "偏瘦"
+  else if (bmi < 25) category = "正常"
+  else if (bmi < 30) category = "超重"
+  else category = "肥胖"
 
   return { bmi, bmiCategory: category }
 }
