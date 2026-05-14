@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { calculateAll } from "@/lib/health"
 
-export async function GET() {
+export async function GET(request: Request) {
   const sessionId = crypto.randomUUID()
 
   const user = await prisma.user.create({
@@ -47,7 +47,9 @@ export async function GET() {
     },
   })
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+  const host = request.headers.get("host") || "localhost:3000"
+  const protocol = request.headers.get("x-forwarded-proto") || "http"
+  const baseUrl = `${protocol}://${host}`
 
   return NextResponse.json({
     success: true,
