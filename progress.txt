@@ -522,3 +522,51 @@ Started: Sun May 10 20:53:58     2026
   - US-018 (end-to-end flow + error handling) is the final remaining story
 ---
 
+## 2026-05-14T08:55:00Z - US-017 (build — Ralph build phase verification)
+- Contract status: locked (score 82). All code already committed (b9dc198 + 9b607d3 + 6594f24). This round: full Ralph build-phase Pre-QA verification.
+- No code changes needed — all 15 verification steps passed with Playwright browser + curl API tests:
+  - VS1: Dev server started (npm run dev, Next.js 16.2.6, port 3000) ✅
+  - VS2-VS3: PREMIUM test session → /results shows 4 MetricCards (BMI 26.1 超重 / 2211 kcal/天 / 2026年07月30日 / 8.0 kg) + WeightChart SVG (Y 81→71kg, X 第2/4/6/8/10周) + PlanDetails (protein 30%166g/carbs 40%221g/fat 30%74g + exercise + 3 tips) + NO FrostedOverlay ✅
+  - VS4-VS5: FREE session → 4 MetricCards + weight FrostedOverlay (🔒 + "解锁完整方案 — ¥1" CTA) + diet FrostedOverlay (🔒 only, no CTA) ✅
+  - VS6-VS7: PayModal opens with ¥1 + "确认支付" + "取消" + backdrop blur; cancel → modal closes, FREE state unchanged ✅
+  - VS8: Confirm → POST /api/pay (200) → modal closes → PREMIUM WeightChart + PlanDetails displayed, no FrostedOverlay ✅
+  - VS9: Page refresh → PREMIUM data persists ✅
+  - VS10: Playwright route interception 402 → "支付失败，请重试" error + retry button in modal ✅
+  - VS11: Retry after removing interceptor → payment succeeds → PREMIUM data displayed ✅
+  - VS12: Already-PREMIUM session → full data immediately, no paywall ✅
+  - VS13: Loading skeleton — code verified (Skeleton component with animate-pulse) ✅
+  - VS14: No-quiz session → "请先完成测评" + "开始测评" link to / ✅
+  - VS15: npx tsc --noEmit 0 errors; npx eslint . 0 errors 0 warnings ✅
+- Console errors: 0 (no unexpected errors)
+- Pre-QA self-check: all passed (startup/AC实测/error states/typecheck/lint)
+- **Learnings for future iterations:**
+  - US-017 代码已在之前 commits 中完整实现，本轮仅执行 Ralph build phase 验证
+  - US-018（端到端流程串联与异常处理）是下一个故事
+---
+
+## 2026-05-14T11:10:00Z - US-018 (build — first build)
+- 修复了 exercise/page.tsx 中 `/api/quiz/complete` 响应未检查的问题：
+  - 之前：`await fetch("/api/quiz/complete", { method: "POST" })` 后直接 `router.push("/results")`，无论 API 返回什么都跳转
+  - 现在：检查 `!completeRes.ok || !completeData.success`，失败时 `setError()` + `setSubmitting(false)` + `return`
+- 其他 6 条 AC（进度恢复/跳步检测/边界验证/重复支付/未完成提交/无结果查询）均为已有 API 路由的正确行为，无需修改代码
+- 全部 11 条验证步骤通过：
+  - VS1: Dev server 正常启动 ✅
+  - VS2: 完整 FREE 流程（5步→complete→results），API 返回 FREE 数据（weeklyProjection=null, planDetails=null, lockMessage 存在）✅
+  - VS3: 完整 PREMIUM 流程（pay→results），API 返回完整 PREMIUM 数据（weeklyProjection 7项, planDetails 5键）✅
+  - VS4: 进度恢复（3步→重定向到 /quiz/goals，307）✅
+  - VS5: 跳步检测（0步→直接访问 /quiz/goals→重定向到 /，307）✅
+  - VS6: 边界验证（height:3000→400, code=VALIDATION_ERROR, field=height）✅
+  - VS7: 重复支付（PREMIUM 用户→409, code=ALREADY_PREMIUM）✅
+  - VS8: 未完成提交（3/5步→400, code=INCOMPLETE_QUIZ, missingSteps=["GOALS","EXERCISE_FREQUENCY"]）✅
+  - VS9: 无结果查询（session 无 quiz→404, code=NOT_FOUND）✅
+  - VS10: tsc --noEmit 0 错误 ✅
+  - VS11: eslint . 0 错误 0 警告 ✅
+- 文件变更：
+  - `app/quiz/exercise/page.tsx` — +7/-2 行，添加 complete API 响应检查
+- Pre-QA 自评：全部通过（启动/API实测/错误码验证/typecheck/lint）
+- **Learnings for future iterations:**
+  - 端到端集成验证故事应优先用 API curl 测试（快速、精确、可重复），浏览器测试作为补充
+  - 大部分错误处理在前期故事中已完备实现，集成故事重点是发现遗漏的边界情况
+  - fetch 后的响应检查是前端错误处理的最低要求——不检查就跳转等于吞掉所有错误
+  - 中间件的进度感知重定向（GET /api/quiz/progress → STEP_ROUTE_MAP）是简洁可靠的路由守卫模式
+
