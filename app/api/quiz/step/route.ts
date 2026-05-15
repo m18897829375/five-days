@@ -7,6 +7,7 @@ import {
   bodyDataSchema,
   goalsSchema,
   exerciseSchema,
+  formatZodError,
 } from "@/lib/schemas"
 import type { z } from "zod"
 import type { Prisma } from "@prisma/client"
@@ -37,16 +38,6 @@ const STEP_SCHEMAS: Record<StepEnum, z.ZodTypeAny> = {
   EXERCISE_FREQUENCY: exerciseSchema,
 }
 
-function formatZodError(error: z.ZodError) {
-  const issue = error.issues[0]
-  const field = issue.path.join(".")
-  return {
-    code: "VALIDATION_ERROR" as const,
-    message: issue.message,
-    field: field || undefined,
-    received: (issue as unknown as { received?: unknown }).received,
-  }
-}
 
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies()

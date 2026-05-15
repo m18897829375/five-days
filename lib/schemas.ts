@@ -25,6 +25,17 @@ export const exerciseSchema = z.object({
   frequency: z.enum(["sedentary", "light", "moderate", "active", "very_active"]),
 })
 
+export function formatZodError(error: z.ZodError) {
+  const issue = error.issues[0]
+  const field = issue.path.join(".")
+  return {
+    code: "VALIDATION_ERROR" as const,
+    message: issue.message,
+    field: field || undefined,
+    received: issue.input,
+  }
+}
+
 export const ApiErrorSchema = z.object({
   code: z.string(),
   message: z.string(),

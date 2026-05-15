@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import StepPage from "@/components/StepPage"
 import { STEP_ROUTE_MAP } from "@/lib/step-routes"
 import { bodyDataSchema } from "@/lib/schemas"
+import type { z } from "zod"
 
 interface FieldConfig {
   name: "age" | "height" | "currentWeight" | "targetWeight"
@@ -20,20 +21,17 @@ const FIELDS: FieldConfig[] = [
   { name: "targetWeight", label: "目标体重 (kg)", unit: "kg", placeholder: "输入目标体重" },
 ]
 
-function toChineseError(issue: { message: string }): string {
-  const m = issue.message
-  if (m.includes("Too small") || m.includes("greater than or equal to")) {
-    const match = m.match(/>=?\s*(\d+)/)
-    if (match) return `最小值为 ${match[1]}`
+function toChineseError(issue: z.ZodIssue): string {
+  if (issue.code === "too_small") {
+    return `最小值为 ${issue.minimum}`
   }
-  if (m.includes("Too big") || m.includes("less than or equal to")) {
-    const match = m.match(/<=?\s*(\d+)/)
-    if (match) return `最大值为 ${match[1]}`
+  if (issue.code === "too_big") {
+    return `最大值为 ${issue.maximum}`
   }
-  if (m.includes("nan")) {
+  if (issue.code === "invalid_type") {
     return "请输入有效数字"
   }
-  return m
+  return issue.message
 }
 
 export default function BodyPage() {
