@@ -118,6 +118,7 @@ export default function ExercisePage() {
               }}
               disabled={submitting}
               aria-label={option.ariaLabel}
+              aria-pressed={isSelected}
               className={cn(
                 "relative flex flex-col items-center justify-center p-6 rounded-xl text-white font-bold transition-all duration-200",
                 GRADIENT_CLASSES[option.gradient],

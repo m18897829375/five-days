@@ -63,6 +63,7 @@ export default function HomePage() {
             onClick={() => handleSelect(card.range)}
             disabled={loading !== null}
             aria-label={card.ariaLabel}
+            aria-pressed={loading === card.range}
             className={cn(
               "flex flex-col items-center justify-center p-6 rounded-xl text-white font-bold text-lg transition-all duration-200",
               GRADIENT_CLASSES[card.gradient],

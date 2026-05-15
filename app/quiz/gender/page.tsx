@@ -61,6 +61,7 @@ export default function GenderPage() {
             onClick={() => handleSelect(option.value)}
             disabled={loading !== null}
             aria-label={option.ariaLabel}
+            aria-pressed={loading === option.value}
             className={cn(
               "flex flex-col items-center justify-center p-8 rounded-xl text-white font-bold text-lg transition-all duration-200",
               GRADIENT_CLASSES[option.gradient],
