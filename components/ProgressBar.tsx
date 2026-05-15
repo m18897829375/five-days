@@ -11,7 +11,7 @@ export default function ProgressBar({ currentStep }: ProgressBarProps) {
   const currentIndex = QUIZ_STEPS.findIndex((s) => s.step === currentStep)
 
   return (
-    <div className="flex items-center justify-between w-full" role="progressbar" aria-valuenow={currentIndex + 1} aria-valuemin={1} aria-valuemax={5} aria-label={`步骤 ${currentIndex + 1}/5`}>
+    <div className="flex items-center justify-between w-full" role="progressbar" aria-valuenow={currentIndex + 1} aria-valuemin={1} aria-valuemax={QUIZ_STEPS.length} aria-label={`步骤 ${currentIndex + 1}/5`}>
       {QUIZ_STEPS.map((step, index) => {
         const isCompleted = index < currentIndex
         const isCurrent = index === currentIndex
