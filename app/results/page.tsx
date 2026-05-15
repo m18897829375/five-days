@@ -39,13 +39,6 @@ interface ResultsData {
   lockMessage?: string
 }
 
-const BMI_LABEL: Record<string, string> = {
-  underweight: "偏瘦",
-  normal: "正常",
-  overweight: "超重",
-  obese: "肥胖",
-}
-
 function formatDate(iso: string): string {
   const d = new Date(iso)
   return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, "0")}月${String(d.getDate()).padStart(2, "0")}日`
@@ -151,7 +144,7 @@ export default function ResultsPage() {
         <MetricCard
           label="BMI 指数"
           value={data.bmi.toFixed(1)}
-          subtext={BMI_LABEL[data.bmiCategory] ?? data.bmiCategory}
+          subtext={data.bmiCategory}
         />
         <MetricCard
           label="每日摄入"
