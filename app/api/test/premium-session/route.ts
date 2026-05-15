@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma"
 import { calculateAll } from "@/lib/health"
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ success: false, error: "Not Found" }, { status: 404 })
+  }
+
   const sessionId = crypto.randomUUID()
 
   const user = await prisma.user.create({
