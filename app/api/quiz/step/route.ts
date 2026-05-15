@@ -116,6 +116,8 @@ export async function POST(request: NextRequest) {
     update: { data: result.data as Prisma.InputJsonValue },
   })
 
+  await prisma.healthResult.deleteMany({ where: { userId: user.id } })
+
   return NextResponse.json(
     { success: true, nextStep: STEP_NEXT[step] },
     { status: 200 },
