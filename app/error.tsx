@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertTriangle } from "lucide-react"
+import Link from "next/link"
 import { useEffect } from "react"
 
 export default function Error({
@@ -28,12 +29,12 @@ export default function Error({
         >
           重试
         </button>
-        <a
+        <Link
           href="/"
           className="rounded-xl bg-gray-100 px-6 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
         >
           返回首页
-        </a>
+        </Link>
       </div>
     </div>
   )
