@@ -1,6 +1,7 @@
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { createSession } from "@/lib/session"
 
 export async function POST() {
   const cookieStore = await cookies()
@@ -18,22 +19,10 @@ export async function POST() {
     }
   }
 
-  const sessionId = crypto.randomUUID()
-  const user = await prisma.user.create({
-    data: { sessionId, subscription: "FREE" },
-  })
-
-  cookieStore.set({
-    name: "sessionId",
-    value: sessionId,
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 604800,
-  })
+  const session = await createSession()
 
   return NextResponse.json(
-    { success: true, data: { sessionId: user.sessionId, subscription: user.subscription } },
+    { success: true, data: { sessionId: session.sessionId, subscription: session.subscription } },
     { status: 201 },
   )
 }

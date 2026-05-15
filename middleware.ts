@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { STEP_ROUTE_MAP } from "@/lib/step-routes"
+import { createSession, getProgress } from "@/lib/session"
+
+export const runtime = "nodejs"
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow /results to pass through unconditionally
   if (pathname === "/results") {
     return NextResponse.next()
   }
@@ -13,43 +15,34 @@ export async function middleware(request: NextRequest) {
   const sessionId = request.cookies.get("sessionId")?.value
   const origin = request.nextUrl.origin
 
-  // No session cookie → create one
   if (!sessionId) {
     try {
-      const sessionRes = await fetch(`${origin}/api/session`, { method: "POST" })
-      if (sessionRes.ok) {
-        const data = await sessionRes.json()
-        if (data.data.sessionId && typeof data.data.sessionId === "string") {
-          const response = NextResponse.redirect(new URL("/", request.url))
-          response.cookies.set("sessionId", data.data.sessionId, {
-            path: "/",
-            httpOnly: true,
-            sameSite: "lax",
-            maxAge: 60 * 60 * 24 * 7,
-          })
-          return response
-        }
-      }
+      const session = await createSession()
+      const response = NextResponse.redirect(new URL("/", request.url))
+      response.cookies.set("sessionId", session.sessionId, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7,
+      })
+      return response
     } catch {
-      // API unavailable → pass through
+      // DB unavailable → pass through
     }
     return NextResponse.next()
   }
 
-  // Check progress and redirect to correct step if needed
   try {
-    const progressRes = await fetch(`${origin}/api/quiz/progress`, {
-      headers: { Cookie: `sessionId=${sessionId}` },
-    })
+    const progress = await getProgress(sessionId)
 
-    if (progressRes.ok) {
-      const progress = await progressRes.json()
-
-      if (progress.data.isCompleted) {
+    if (progress) {
+      if (progress.isCompleted) {
         return NextResponse.redirect(new URL("/results", request.url))
       }
 
-      const targetRoute = STEP_ROUTE_MAP[progress.data.currentStep]
+      const targetRoute = progress.currentStep
+        ? STEP_ROUTE_MAP[progress.currentStep]
+        : undefined
       if (targetRoute && pathname !== targetRoute) {
         const referer = request.headers.get("referer")
         const isSameOrigin = referer ? referer.startsWith(origin) : false
@@ -60,7 +53,7 @@ export async function middleware(request: NextRequest) {
       }
     }
   } catch {
-    // API unavailable → pass through
+    // DB unavailable → pass through
   }
 
   return NextResponse.next()
