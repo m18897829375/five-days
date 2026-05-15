@@ -51,6 +51,11 @@ export async function middleware(request: NextRequest) {
 
       const targetRoute = STEP_ROUTE_MAP[progress.currentStep]
       if (targetRoute && pathname !== targetRoute) {
+        const referer = request.headers.get("referer")
+        const isSameOrigin = referer ? referer.startsWith(origin) : false
+        if (isSameOrigin) {
+          return NextResponse.next()
+        }
         return NextResponse.redirect(new URL(targetRoute, request.url))
       }
     }
