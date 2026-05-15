@@ -5,16 +5,12 @@ import { useRouter } from "next/navigation"
 import StepPage from "@/components/StepPage"
 import { STEP_ROUTE_MAP } from "@/lib/step-routes"
 import { cn } from "@/lib/utils"
+import { GRADIENT_CLASSES } from "@/lib/styles"
 
 const GENDER_OPTIONS = [
   { value: "male" as const, symbol: "♂", gradient: "blue", ariaLabel: "选择男性", label: "男性" },
   { value: "female" as const, symbol: "♀", gradient: "pink", ariaLabel: "选择女性", label: "女性" },
 ]
-
-const GRADIENT_CLASSES: Record<string, string> = {
-  blue: "bg-gradient-to-br from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800",
-  pink: "bg-gradient-to-br from-pink-500 to-pink-700 hover:from-pink-600 hover:to-pink-800",
-}
 
 export default function GenderPage() {
   const router = useRouter()

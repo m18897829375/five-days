@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import StepPage from "@/components/StepPage"
 import { STEP_ROUTE_MAP } from "@/lib/step-routes"
 import { cn } from "@/lib/utils"
+import { GRADIENT_CLASSES } from "@/lib/styles"
 
 const EXERCISE_OPTIONS = [
   {
@@ -28,7 +29,7 @@ const EXERCISE_OPTIONS = [
     icon: "🏃",
     label: "中度",
     description: "每周运动 3-4 次，中等强度",
-    gradient: "blue",
+    gradient: "blueStatic",
     ariaLabel: "选择中度 — 每周运动 3-4 次，中等强度",
   },
   {
@@ -36,7 +37,7 @@ const EXERCISE_OPTIONS = [
     icon: "🚴",
     label: "活跃",
     description: "每周运动 5-6 次，高强度训练",
-    gradient: "orange",
+    gradient: "orangeStatic",
     ariaLabel: "选择活跃 — 每周运动 5-6 次，高强度训练",
   },
   {
@@ -48,14 +49,6 @@ const EXERCISE_OPTIONS = [
     ariaLabel: "选择非常活跃 — 每天运动，专业运动员级别",
   },
 ]
-
-const GRADIENT_CLASSES: Record<string, string> = {
-  slate: "bg-gradient-to-br from-slate-500 to-slate-700",
-  teal: "bg-gradient-to-br from-teal-500 to-teal-700",
-  blue: "bg-gradient-to-br from-blue-500 to-blue-700",
-  orange: "bg-gradient-to-br from-orange-500 to-orange-700",
-  red: "bg-gradient-to-br from-red-500 to-red-700",
-}
 
 export default function ExercisePage() {
   const router = useRouter()

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import StepPage from "@/components/StepPage"
 import { STEP_ROUTE_MAP } from "@/lib/step-routes"
 import { cn } from "@/lib/utils"
+import { GRADIENT_CLASSES } from "@/lib/styles"
 
 const AGE_CARDS = [
   { range: "18-29" as const, emoji: "🧑", gradient: "blue", ariaLabel: "选择 18-29 岁 年龄段" },
@@ -12,13 +13,6 @@ const AGE_CARDS = [
   { range: "40-49" as const, emoji: "🧔", gradient: "orange", ariaLabel: "选择 40-49 岁 年龄段" },
   { range: "50+" as const, emoji: "👴", gradient: "purple", ariaLabel: "选择 50+ 岁 年龄段" },
 ]
-
-const GRADIENT_CLASSES: Record<string, string> = {
-  blue: "bg-gradient-to-br from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800",
-  green: "bg-gradient-to-br from-green-500 to-green-700 hover:from-green-600 hover:to-green-800",
-  orange: "bg-gradient-to-br from-orange-500 to-orange-700 hover:from-orange-600 hover:to-orange-800",
-  purple: "bg-gradient-to-br from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800",
-}
 
 export default function HomePage() {
   const router = useRouter()
