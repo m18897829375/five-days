@@ -56,9 +56,11 @@ export async function GET() {
 
   return NextResponse.json({
     success: true,
-    currentStep,
-    completedSteps,
-    data,
-    isCompleted,
+    data: {
+      currentStep,
+      completedSteps,
+      data,
+      isCompleted,
+    },
   })
 }

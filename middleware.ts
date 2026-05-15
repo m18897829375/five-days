@@ -19,9 +19,9 @@ export async function middleware(request: NextRequest) {
       const sessionRes = await fetch(`${origin}/api/session`, { method: "POST" })
       if (sessionRes.ok) {
         const data = await sessionRes.json()
-        if (data.sessionId && typeof data.sessionId === "string") {
+        if (data.data.sessionId && typeof data.data.sessionId === "string") {
           const response = NextResponse.redirect(new URL("/", request.url))
-          response.cookies.set("sessionId", data.sessionId, {
+          response.cookies.set("sessionId", data.data.sessionId, {
             path: "/",
             httpOnly: true,
             sameSite: "lax",
@@ -45,11 +45,11 @@ export async function middleware(request: NextRequest) {
     if (progressRes.ok) {
       const progress = await progressRes.json()
 
-      if (progress.isCompleted) {
+      if (progress.data.isCompleted) {
         return NextResponse.redirect(new URL("/results", request.url))
       }
 
-      const targetRoute = STEP_ROUTE_MAP[progress.currentStep]
+      const targetRoute = STEP_ROUTE_MAP[progress.data.currentStep]
       if (targetRoute && pathname !== targetRoute) {
         const referer = request.headers.get("referer")
         const isSameOrigin = referer ? referer.startsWith(origin) : false

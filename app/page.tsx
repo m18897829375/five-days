@@ -44,7 +44,7 @@ export default function HomePage() {
         return
       }
 
-      const route = STEP_ROUTE_MAP[data.nextStep]
+      const route = STEP_ROUTE_MAP[data.data.nextStep]
       if (route) {
         router.push(route)
       }

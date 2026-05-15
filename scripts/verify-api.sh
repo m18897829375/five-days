@@ -38,8 +38,8 @@ else
     FAIL=$((FAIL + 1))
 fi
 
-SESSION_ID=$(echo "$BODY" | jq -r '.sessionId // empty')
-SUB=$(echo "$BODY" | jq -r '.subscription // empty')
+SESSION_ID=$(echo "$BODY" | jq -r '.data.sessionId // empty')
+SUB=$(echo "$BODY" | jq -r '.data.subscription // empty')
 if [ -n "$SESSION_ID" ] && [ "$SUB" = "FREE" ]; then
     echo -e "  ${GREEN}[PASS]${NC} Response: sessionId=$SESSION_ID, subscription=$SUB"
     PASS=$((PASS + 1))
@@ -60,7 +60,7 @@ HTTP_CODE=$(echo "$RESP" | tail -1)
 BODY=$(echo "$RESP" | head -n -1)
 
 if [ "$HTTP_CODE" = "200" ]; then
-    NEXT=$(echo "$BODY" | jq -r '.nextStep // empty')
+    NEXT=$(echo "$BODY" | jq -r '.data.nextStep // empty')
     if [ -n "$NEXT" ]; then
         echo -e "  ${GREEN}[PASS]${NC} AGE_RANGE saved, nextStep=$NEXT"
         PASS=$((PASS + 1))
@@ -141,8 +141,8 @@ HTTP_CODE=$(echo "$RESP" | tail -1)
 BODY=$(echo "$RESP" | head -n -1)
 
 if [ "$HTTP_CODE" = "200" ]; then
-    IS_COMPLETED=$(echo "$BODY" | jq -r '.isCompleted // false')
-    COMPLETED_COUNT=$(echo "$BODY" | jq -r '.completedSteps | length // 0')
+    IS_COMPLETED=$(echo "$BODY" | jq -r '.data.isCompleted // false')
+    COMPLETED_COUNT=$(echo "$BODY" | jq -r '.data.completedSteps | length // 0')
     if [ "$IS_COMPLETED" = "true" ] && [ "$COMPLETED_COUNT" -eq 5 ]; then
         echo -e "  ${GREEN}[PASS]${NC} Progress: isCompleted=true, ${COMPLETED_COUNT}/5 steps done"
         PASS=$((PASS + 1))
@@ -191,11 +191,11 @@ HTTP_CODE=$(echo "$RESP" | tail -1)
 BODY=$(echo "$RESP" | head -n -1)
 
 if [ "$HTTP_CODE" = "200" ]; then
-    SUB=$(echo "$BODY" | jq -r '.subscription // empty')
-    BMI=$(echo "$BODY" | jq -r '.bmi // empty')
-    WP=$(echo "$BODY" | jq -r '.weeklyProjection // empty')
-    PD=$(echo "$BODY" | jq -r '.planDetails // empty')
-    LOCK=$(echo "$BODY" | jq -r '.lockMessage // empty')
+    SUB=$(echo "$BODY" | jq -r '.data.subscription // empty')
+    BMI=$(echo "$BODY" | jq -r '.data.bmi // empty')
+    WP=$(echo "$BODY" | jq -r '.data.weeklyProjection')
+    PD=$(echo "$BODY" | jq -r '.data.planDetails')
+    LOCK=$(echo "$BODY" | jq -r '.data.lockMessage // empty')
 
     if [ "$SUB" = "FREE" ] && [ -n "$BMI" ] && [ "$WP" = "null" ] && [ "$PD" = "null" ] && [ -n "$LOCK" ]; then
         echo -e "  ${GREEN}[PASS]${NC} FREE results: BMI=$BMI, locked data hidden, lockMessage present"
@@ -219,7 +219,7 @@ HTTP_CODE=$(echo "$RESP" | tail -1)
 BODY=$(echo "$RESP" | head -n -1)
 
 if [ "$HTTP_CODE" = "200" ]; then
-    NEW_SUB=$(echo "$BODY" | jq -r '.subscription // empty')
+    NEW_SUB=$(echo "$BODY" | jq -r '.data.subscription // empty')
     if [ "$NEW_SUB" = "PREMIUM" ]; then
         echo -e "  ${GREEN}[PASS]${NC} Payment successful, subscription=$NEW_SUB"
         PASS=$((PASS + 1))
@@ -253,12 +253,12 @@ HTTP_CODE=$(echo "$RESP" | tail -1)
 BODY=$(echo "$RESP" | head -n -1)
 
 if [ "$HTTP_CODE" = "200" ]; then
-    SUB=$(echo "$BODY" | jq -r '.subscription // empty')
-    WP=$(echo "$BODY" | jq -r '.weeklyProjection | type // empty')
-    PD=$(echo "$BODY" | jq -r '.planDetails | type // empty')
+    SUB=$(echo "$BODY" | jq -r '.data.subscription // empty')
+    WP=$(echo "$BODY" | jq -r '.data.weeklyProjection | type // empty')
+    PD=$(echo "$BODY" | jq -r '.data.planDetails | type // empty')
 
     if [ "$SUB" = "PREMIUM" ] && [ "$WP" = "array" ] && [ "$PD" = "object" ]; then
-        WP_COUNT=$(echo "$BODY" | jq -r '.weeklyProjection | length')
+        WP_COUNT=$(echo "$BODY" | jq -r '.data.weeklyProjection | length')
         echo -e "  ${GREEN}[PASS]${NC} PREMIUM results: subscription=$SUB, weeklyProjection[$WP_COUNT], planDetails present"
         PASS=$((PASS + 1))
     else
@@ -276,7 +276,7 @@ HTTP_CODE=$(echo "$RESP" | tail -1)
 BODY=$(echo "$RESP" | head -n -1)
 
 if [ "$HTTP_CODE" = "200" ]; then
-    TEST_SID=$(echo "$BODY" | jq -r '.sessionId // empty')
+    TEST_SID=$(echo "$BODY" | jq -r '.data.sessionId // empty')
     if [ -n "$TEST_SID" ]; then
         echo -e "  ${GREEN}[PASS]${NC} Test premium session created: $TEST_SID"
         PASS=$((PASS + 1))

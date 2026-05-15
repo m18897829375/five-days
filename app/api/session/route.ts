@@ -12,7 +12,7 @@ export async function POST() {
     })
     if (user) {
       return NextResponse.json(
-        { success: true, sessionId: user.sessionId, subscription: user.subscription },
+        { success: true, data: { sessionId: user.sessionId, subscription: user.subscription } },
         { status: 200 },
       )
     }
@@ -33,7 +33,7 @@ export async function POST() {
   })
 
   return NextResponse.json(
-    { success: true, sessionId: user.sessionId, subscription: user.subscription },
+    { success: true, data: { sessionId: user.sessionId, subscription: user.subscription } },
     { status: 201 },
   )
 }

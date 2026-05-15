@@ -112,5 +112,5 @@ export async function POST() {
     },
   })
 
-  return NextResponse.json({ success: true, result }, { status: 200 })
+  return NextResponse.json({ success: true, data: { result } }, { status: 200 })
 }

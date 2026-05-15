@@ -84,7 +84,7 @@ export default function ExercisePage() {
         return
       }
 
-      const route = data.nextStep ? STEP_ROUTE_MAP[data.nextStep] : null
+      const route = data.data.nextStep ? STEP_ROUTE_MAP[data.data.nextStep] : null
       if (route) {
         router.push(route)
       } else {
