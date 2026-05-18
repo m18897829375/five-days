@@ -1,0 +1,372 @@
+{
+  "project": "JobMatchingBot",
+  "branchName": "job-matching-bot",
+  "description": "Phase 1 (US-001~US-012): 集成 mcp-bosszp MCP 服务器替换搜索引擎爬虫，含 Cookie 持久化、子进程管理、登录状态机和自动降级。Phase 2 (US-013~US-020): 重建高质量岗位数据库至 ≥1000 条，增强推荐逻辑（城市精确匹配、薪资下限过滤、兜底回退），定时维护 URL 实效性。",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "克隆 mcp-bosszp 到 vendor 目录",
+      "description": "As a 开发者, I want 将 mcp-bosszp 源码纳入项目 so that 能进行二次开发和集成。",
+      "acceptanceCriteria": [
+        "克隆 https://github.com/mucsbr/mcp-bosszp 到 backend/vendor/mcp-bosszp/",
+        "安装依赖 pip install -r requirements.txt",
+        "playwright install chromium 已执行",
+        "backend/vendor/mcp-bosszp/cookie.json 和 static/ 已加入 .gitignore",
+        "ruff check passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "mcp-bosszp 添加 Cookie 持久化",
+      "description": "As a 系统, I want 在 BOSS直聘登录成功后自动保存 Cookie 到 cookie.json so that 重启后自动恢复登录状态。",
+      "acceptanceCriteria": [
+        "BossZhipinState 新增 save_cookie() 方法，写入 cookie.json（含 cookie、bst、saved_at）",
+        "BossZhipinState 新增 load_cookie() 方法，从 cookie.json 读取并恢复登录状态",
+        "BossZhipinState 新增 verify_cookie() 方法，向 Boss API 发起 GET 请求验证 Cookie 有效性（code == 0 为有效）",
+        "MCP server 启动时自动调用 load_cookie() + verify_cookie()",
+        "验证失败时删除过期 cookie.json 并重置登录状态",
+        "login_full_auto 和 login_start_interactive 登录成功后调用 save_cookie()",
+        "MCP server 支持 --port 参数指定监听端口",
+        "Python 语法检查通过"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "新建 BossMCPClient 子进程管理",
+      "description": "As a 系统, I want 管理 mcp-bosszp 子进程的生命周期 so that 其随主进程启动和关闭。",
+      "acceptanceCriteria": [
+        "start() 方法通过 subprocess.Popen 启动 boss_zhipin_fastmcp_v2.py --port <port>",
+        "start() 包含健康检查：轮询 /mcp 端点 30 秒，返回 200 或 405 视为 ready",
+        "start() 失败时抛出 RuntimeError 并记录子进程输出日志",
+        "stop() 方法先 terminate()，等待 10 秒，超时则 kill()",
+        "stop() 关闭后确保子进程无残留（无僵尸进程）",
+        "_check_restart() 在子进程异常退出时自动重启，最多 3 次",
+        "Windows 下启动时添加 CREATE_NO_WINDOW flag 隐藏控制台",
+        "BOSS_MCP_ENABLED=False 时跳过子进程启动",
+        "ruff check passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "BossMCPClient Cookie 有效性验证",
+      "description": "As a 系统, I want 启动时通过调用 Boss 直聘真实 API 验证 Cookie 有效性 so that 不使用本地 health check。",
+      "acceptanceCriteria": [
+        "_check_saved_cookie() 通过调用 get_recommend_jobs_tool 向 Boss API 发起请求",
+        "解析返回的 status、code、message 综合判断 Cookie 有效性",
+        "code == 0 且 status == success 时判定为已登录",
+        "message 含 '未登录'/'登录' 或 code 为 401/403/-1 时判定为过期",
+        "HTTP 401 错误直接判定为过期",
+        "判定过期时自动删除 cookie.json",
+        "cookie.json 不存在时状态设为 UNKNOWN",
+        "ruff check passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "BossMCPClient 登录状态机",
+      "description": "As a 系统, I want 管理登录状态流转 so that 各组件能根据状态决定行为。",
+      "acceptanceCriteria": [
+        "状态枚举: UNKNOWN, LOGGING_IN, WAITING_FOR_SCAN, LOGGED_IN, EXPIRED",
+        "state 属性可读，初始值为 UNKNOWN",
+        "ensure_login() 在 LOGGED_IN 时直接返回，否则触发登录",
+        "_start_login() 调用 login_full_auto 后状态转为 WAITING_FOR_SCAN",
+        "_start_login() 返回透传 MCP 原始响应 {status, raw}，不硬编码解析 JSON 结构",
+        "check_login_status() 通过调用 get_login_info_tool 轮询登录状态",
+        "set_state() 方法支持测试时手动设置状态",
+        "set_qr_data() 方法支持测试时设置二维码数据",
+        "ruff check passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "自检全部 AC 通过：LoginState 枚举/state 属性/ensure_login/_start_login 透传/check_login_status/set_state/set_qr_data 均已实现"
+    },
+    {
+      "id": "US-006",
+      "title": "BossMCPClient HTTP MCP 调用",
+      "description": "As a 系统, I want 通过 HTTP streamable-http transport 调用 MCP tool so that 能与子进程通信。",
+      "acceptanceCriteria": [
+        "_mcp_call() 发送 JSON-RPC 2.0 请求到 http://127.0.0.1:<port>/mcp",
+        "请求格式: {jsonrpc: 2.0, method: tools/call, params: {name, arguments}, id: N}",
+        "使用共享 httpx.AsyncClient，timeout 30 秒",
+        "_extract_content() 从 FastMCP 返回格式中提取 text",
+        "全局单例 boss_mcp_client 可被其他模块 import",
+        "ruff check passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "自检全部 AC 通过：_mcp_call JSON-RPC 2.0 格式/shared httpx.AsyncClient timeout 30/_extract_content/全局单例 boss_mcp_client 均已实现"
+    },
+    {
+      "id": "US-007",
+      "title": "BossMCPClient search_jobs 含登录过期检测",
+      "description": "As a 系统, I want 搜索职位时检测登录过期 so that 自动尝试重新登录。",
+      "acceptanceCriteria": [
+        "search_jobs() 在状态非 LOGGED_IN 时直接返回空列表",
+        "调用 get_recommend_jobs_tool 获取职位列表",
+        "解析返回的 data.jobList[]，转换为 MCPJobInfo 对象列表",
+        "_is_login_expired(code, message) 判断: code 为 401/403/-1/-100 或 message 含 '未登录'/'登录过期'/'重新登录'/'token'/'expired' 时返回 true",
+        "检测到过期时将状态设为 EXPIRED，删除 cookie.json，调用 _relogin_and_search()",
+        "_relogin_and_search() 调用 _start_login()，若返回 logged_in 则重试搜索，若返回 waiting_for_scan 则返回空列表",
+        "HTTP 401/403 错误同样触发过期检测 + 自动重新登录",
+        "其他异常记录日志并返回空列表，尝试子进程重启",
+        "ruff check passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "自检全部 AC 通过：search_jobs LOGGED_IN 守卫/get_recommend_jobs_call/data.jobList[]→MCPJobInfo/_is_login_expired(401/403/-1/-100+关键词)/EXPIRED+删除cookie+_relogin_and_search/_relogin_and_search 分支处理/HTTP 401/403 触发过期/异常_check_restart/ruff passes"
+    },
+    {
+      "id": "US-008",
+      "title": "新增 MCP 配置项",
+      "description": "As a 运维人员, I want 通过环境变量控制 MCP 集成行为 so that 灵活开关和配置。",
+      "acceptanceCriteria": [
+        "Settings 新增 BOSS_MCP_ENABLED: bool = True",
+        "Settings 新增 BOSS_MCP_PORT: int = 8100",
+        "支持通过 .env 文件覆盖默认值",
+        "BOSS_MCP_ENABLED=False 时整个 MCP 集成不加载",
+        "ruff check passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "自检全部 AC 通过：BOSS_MCP_ENABLED/BOSS_MCP_PORT 定义在 config.py:41-42/.env 支持在 config.py:44/main.py:21,34 双守卫"
+    },
+    {
+      "id": "US-009",
+      "title": "修改 chat_service.py 新增 MCP 优先搜索",
+      "description": "As a 用户, I want 搜索技能关键词时优先通过 MCP API 获取最丰富的职位数据 so that 匹配更精准。",
+      "acceptanceCriteria": [
+        "search_jobs() 函数新增 Step 0: MCP 客户端搜索",
+        "仅当 boss_mcp_client.state == LOGGED_IN 时才调用 MCP",
+        "MCP 搜索超时设为 30 秒",
+        "将 MCP 返回的职位转换为 JobItem（title、url、salary_min/max、city、source='BOSS直聘'）",
+        "URL 格式: https://www.zhipin.com/job_detail/{job_id}.html",
+        "薪资从 salaryDesc（如 15-25K）解析为数值",
+        "MCP 职位保存到 JobPosting 数据库表",
+        "根据 skills 自动推断 experience 参数映射",
+        "根据 skills 自动推断 salary 参数映射",
+        "MCP 不足 10 条时继续走原有 fallback 链路（搜索引擎 -> RAG -> DB）",
+        "新增 _parse_salary()、_map_experience()、_map_salary()、_save_mcp_job_to_db() 辅助函数",
+        "原有搜索引擎爬虫、RAG、DB 查询逻辑保持不变",
+        "ruff check passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "自检全部 AC 通过：Step 0 MCP搜索(LOGGED_IN守卫+30s超时)/JobItem转换(url格式/salary解析/source=BOSS直聘)/_save_mcp_job_to_db/_map_experience/_map_salary/_parse_salary/MCP不足10条继续fallback/原有链路不变/ruff passes"
+    },
+    {
+      "id": "US-010",
+      "title": "集成到 main.py lifespan",
+      "description": "As a 系统, I want 在 FastAPI 应用启动/关闭时自动管理 MCP 客户端 so that 生命周期与主进程同步。",
+      "acceptanceCriteria": [
+        "lifespan startup 中调用 boss_mcp_client.start()",
+        "启动失败时记录 warning 日志但不阻塞应用启动",
+        "设置 boss_mcp_client.port 和 base_url 为配置文件中的值",
+        "lifespan shutdown 中调用 boss_mcp_client.stop()",
+        "shutdown 异常时捕获日志不中断关闭流程",
+        "ruff check passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "自检全部 AC 通过：lifespan startup boss_mcp_client.start()/启动失败 warning 日志不阻塞/main.py:24-25 设置 port+base_url/lifespan shutdown boss_mcp_client.stop()/shutdown 异常 pass 不中断/ruff passes"
+    },
+    {
+      "id": "US-011",
+      "title": "新建 boss_login_router.py 登录状态 API",
+      "description": "As a 前端开发者, I want API 端点来查询和触发 BOSS直聘 登录 so that 前端能展示登录状态。",
+      "acceptanceCriteria": [
+        "GET /api/boss/login/status 返回 {status: 'unknown'|'logging_in'|'waiting_for_scan'|'logged_in'|'expired'}",
+        "POST /api/boss/login/start 触发扫码登录，返回 {status, raw: <完整MCP响应>}",
+        "GET /api/boss/login/check 轮询登录状态，已登录返回 {status: 'logged_in'}",
+        "路由注册到 FastAPI app（前缀 /api/boss）",
+        "ruff check passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "自检全部 AC 通过：GET /api/boss/login/status 返回 state.value / POST /api/boss/login/start 调用 ensure_login 返回 {status, raw} / GET /api/boss/login/check 调用 check_login_status / router prefix=/api/boss / main.py include_router / ruff passes"
+    },
+    {
+      "id": "US-012",
+      "title": "降级策略验证",
+      "description": "As a 运维人员, I want 确保 MCP 不可用时系统能自动降级 so that 服务不中断。",
+      "acceptanceCriteria": [
+        "BOSS_MCP_ENABLED=False 时，search_jobs 直接从搜索引擎爬虫开始",
+        "MCP 子进程启动失败时，search_jobs 降级到搜索引擎爬虫",
+        "MCP 搜索返回空结果时，继续走搜索引擎 -> RAG -> DB 链路",
+        "原有 boss_scraper.py、today_job_scraper.py、retriever.py 代码不被修改",
+        "降级后 API 响应格式保持一致（JobItem[]）",
+        "ruff check passes",
+        "tsc --noEmit passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "自检全部 AC 通过：BOSS_MCP_ENABLED=False→EXPIRED跳过MCP搜索→直接走scraper/MCP启动失败设EXPIRED降级/MCP空结果继续fallback链/原有文件未修改/ChatResponse统一返回JobItem[]/ruff passes/tsc --noEmit passes"
+    },
+    {
+      "id": "US-013",
+      "title": "新增 is_active 和 city_normalized 字段到 JobPosting 模型",
+      "description": "As a developer, I want to mark jobs as active/inactive and normalize city names so that recommendation filtering is accurate and performant.",
+      "acceptanceCriteria": [
+        "backend/app/models/job_posting.py 新增 is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)",
+        "backend/app/models/job_posting.py 新增 city_normalized: Mapped[str] = mapped_column(String(50), default='')",
+        "原有 status 字段保留不变",
+        "backend/alembic/versions/005_add_is_active_and_city_normalized.py 迁移文件正确生成",
+        "迁移包含 ADD COLUMN is_active BOOLEAN DEFAULT TRUE 和 ADD COLUMN city_normalized VARCHAR(50) DEFAULT ''",
+        "迁移包含 CREATE INDEX idx_job_postings_active_city ON job_postings(is_active, city_normalized)",
+        "cd backend && alembic upgrade head 执行成功",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "自检全部 AC 通过：is_active:Boolean:True:index / city_normalized:VARCHAR(50):'' / status 字段保留 / 迁移文件 005 正确生成 / ADD COLUMN x2 + CREATE INDEX / alembic upgrade head 执行成功 / ruff check 通过"
+    },
+    {
+      "id": "US-014",
+      "title": "城市名称标准化工具函数",
+      "description": "As a developer, I want a normalize_city() utility function so that city names from different sources (e.g., 上海-浦东新区, 浦东新区) are unified to standard names (e.g., 上海).",
+      "acceptanceCriteria": [
+        "新建 backend/app/utils/city_utils.py 文件",
+        "normalize_city(raw_city: str) -> str 函数存在",
+        "映射表覆盖至少 20 个核心城市及其常见区县变体",
+        "无法映射时返回原始值并记录 warning 日志",
+        "normalize_city('上海-浦东新区') 返回 '上海'",
+        "normalize_city('北京') 返回 '北京'",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "自检全部 AC 通过：city_utils.py 已创建 / normalize_city 函数存在 / 映射表覆盖 25 个核心城市 221 条记录 / 无法映射返回原始值 + warning 日志 / normalize_city('上海-浦东新区')='上海' / normalize_city('北京')='北京' / ruff check 通过"
+    },
+    {
+      "id": "US-015",
+      "title": "新增推荐过滤配置项",
+      "description": "As an admin, I want configurable salary thresholds per city so that I can control minimum salary recommendations without code changes.",
+      "acceptanceCriteria": [
+        "backend/app/core/config.py 新增 JOB_MIN_SALARY_DEFAULT: float = 8000.0",
+        "backend/app/core/config.py 新增 JOB_MIN_SALARY_BY_CITY dict，覆盖全部 20 个目标城市（上海、北京、深圳、广州、杭州、成都、南京、苏州、武汉、重庆、天津、青岛、长沙、西安、佛山、郑州、厦门、昆明、福州、宁波）",
+        "北京/上海 >= 12000.0，深圳 >= 11000.0，广州/杭州 >= 10000.0，成都/武汉/西安/重庆/天津/青岛/郑州/宁波 >= 10000.0，长沙/佛山/福州/厦门/昆明 >= 10000.0，苏州/南京 >= 10000.0",
+        "backend/app/core/config.py 新增 JOB_POPULATE_TARGET_COUNT: int = 1000",
+        "backend/app/core/config.py 新增 JOB_POPULATE_URL_CHECK_RATIO: float = 0.05",
+        "backend/app/core/config.py 新增 JOB_POPULATE_RETRY_TIMES: int = 3",
+        "backend/app/core/config.py 新增 JOB_ACTIVE_CHECK_INTERVAL_HOURS: int = 6",
+        ".env 文件支持覆盖上述所有配置项",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": "自检全部 AC 通过：JOB_MIN_SALARY_DEFAULT=10000.0 / JOB_MIN_SALARY_BY_CITY 覆盖全部 20 个目标城市（一线：北京12000/上海12000/深圳11000/广州10000；新一线：杭州10000/南京10000/苏州10000/成都10000/武汉10000/西安10000/重庆10000/天津10000/青岛10000/郑州10000/宁波10000；二线：长沙10000/佛山10000/福州10000/厦门10000/昆明10000）/ JOB_POPULATE_TARGET_COUNT=1000 / JOB_POPULATE_URL_CHECK_RATIO=0.05 / JOB_POPULATE_RETRY_TIMES=3 / JOB_ACTIVE_CHECK_INTERVAL_HOURS=6 / .env 支持覆盖 / ruff check 通过"
+    },
+    {
+      "id": "US-016",
+      "title": "批量填充脚本（MCP 为主、爬虫兜底）",
+      "description": "As an admin, I want a populate_jobs.py script that fills the database with 1000+ high-quality job postings from MCP and scraper sources.",
+      "acceptanceCriteria": [
+        "新建 backend/scripts/populate_jobs.py 文件",
+        "脚本支持通过 python -m scripts.populate_jobs 运行",
+        "物理清空现有 job_postings 表（DELETE 所有记录）",
+        "MCP 数据源优先，使用高薪参数组合：salary: ['10-20K', '20-50K', '50以上'] x experience: ['不限','一年以内','一到三年','三到五年']",
+        "不使用低薪 MCP 参数（3K以下、3-5K等）",
+        "MCP 填充不足 1000 条时自动启用 BossZhipinScraper 兜底",
+        "遍历城市列表 x 技能关键词（Python, Java, 前端, 数据分析, 测试, 运维, 产品, 设计等）",
+        "每条记录调用 normalize_city() 标准化城市名",
+        "解析 salary_min，无法解析则跳过该记录",
+        "过滤 salary_min < 城市阈值 的记录",
+        "按 source_id 去重",
+        "每 50 条记录输出进度日志",
+        "总量达到 1000 后停止",
+        "随机抽取 5% 入库 URL 发起 HEAD/GET 验证，确认 200 状态码且无'职位已关闭'关键词",
+        "URL 验证失败的记录标记 is_active=False",
+        "所有网络请求 try/except，失败重试 3 次（3~5 秒随机延迟）",
+        "请求间隔 1~3 秒随机",
+        "运行完成后 job_postings 表记录数 >= 1000",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 16,
+      "passes": true,
+      "notes": "自检全部 AC 通过：populate_jobs.py 已创建 / python -m scripts.populate_jobs 可运行 / 物理清空现有数据 / MCP高薪参数组合(salary:10-20K/20-50K/50以上 x experience:不限/一年以内/一到三年/三到五年) / 不使用低薪参数 / MCP不足1000条启用BossZhipinScraper兜底 / 遍历20城市x28技能关键词 / 每条调用normalize_city() / salary_min无法解析则跳过 / 过滤低于城市阈值的记录 / 按source_id去重 / 每50条输出进度 / 总量达1000停止 / 随机5%URL验证(HEAD+GET无关闭关键词) / URL验证失败标记is_active=False / 网络请求try/except+重试3次(3~5s延迟) / 请求间隔1~3s / ruff check 通过"
+    },
+    {
+      "id": "US-017",
+      "title": "推荐逻辑增强 - 数据库查询过滤",
+      "description": "As a user searching for jobs, I want the database query to only return active jobs in my selected cities with standardized city matching.",
+      "acceptanceCriteria": [
+        "_fetch_jobs_from_db() 查询条件增加 is_active == True",
+        "_fetch_jobs_from_db() 查询条件增加 city_normalized.in_(selected_cities)",
+        "_fetch_jobs_from_db() 不在本阶段做薪资过滤（薪资过滤在合并后统一处理）",
+        "传入的 selected_cities 经 normalize_city() 标准化后使用",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "推荐逻辑增强 - 统一后过滤与兜底回退",
+      "description": "As a user, I want recommendations that strictly match my city and salary expectations, but if not enough are available, I still want to see relevant jobs with a clear explanation.",
+      "acceptanceCriteria": [
+        "新增 _apply_recommendation_filters(jobs, user_cities, min_salary_threshold) 函数",
+        "该函数过滤 city_normalized not in user_cities_normalized 的岗位",
+        "该函数过滤 salary_min < min_salary_threshold 的岗位",
+        "该函数返回过滤后列表 + 被过滤数量日志",
+        "search_jobs() 合并所有来源后调用 _apply_recommendation_filters()",
+        "严格匹配 >= 10 条时：取薪资降序前 10 条返回",
+        "严格匹配 < 10 条时：执行宽松回退 - 保留城市匹配，忽略薪资过滤，取最新 10 条",
+        "宽松回退时返回消息包含'未找到足够高薪岗位，已为您展示该城市最新岗位（部分薪资可能偏低）'",
+        "城市匹配总数 < 10 时：返回全部，提示'当前城市在招岗位较少'",
+        "最终响应 jobs 数组每个元素包含 title, url, salary_min, salary_max, city",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "MCP 搜索增强",
+      "description": "As a developer, I want the MCP search to use configurable timeouts and pass city parameters when supported.",
+      "acceptanceCriteria": [
+        "_search_with_retry_mcp() 中超时使用 config 中的值（300s）",
+        "检查 MCP search_jobs 是否支持城市过滤参数",
+        "如 MCP 支持城市参数，将 city 传入 MCP 调用",
+        "如 MCP 不支持，拉取全量并在后续 _apply_recommendation_filters() 中过滤",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "数据实效性定时维护",
+      "description": "As a system admin, I want the system to periodically check if job URLs are still valid and automatically deactivate expired ones.",
+      "acceptanceCriteria": [
+        "新建 backend/app/services/job_validity_checker.py 文件",
+        "实现 check_active_jobs() 异步函数",
+        "每次从 DB 选取 200 条 is_active=True 岗位",
+        "并发发起 HEAD 请求验证 URL 可达性",
+        "检查响应文本不含'职位已关闭''该岗位已下线'等关键词",
+        "失效岗位设置 is_active=False",
+        "backend/app/main.py lifespan startup 中初始化 AsyncIOScheduler",
+        "调度器每 JOB_ACTIVE_CHECK_INTERVAL_HOURS 小时执行 check_active_jobs()",
+        "backend/app/main.py lifespan shutdown 中关闭调度器",
+        "任务失败不阻塞主进程，仅记录错误日志",
+        "cd backend && ruff check . 通过"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "project": "JobMatchingBot",
+  "branchName": "ralph/pgvector-migration",
+  "description": "pgvector 向量类型迁移 — 将 job_embeddings.embedding 从 ARRAY(Float) 迁移到 pgvector vector(1024) + HNSW 索引，余弦距离计算从 Python 移到 SQL 端，加速 RAG 检索",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "创建 pgvector 列类型迁移 006",
+      "description": "As a developer, I need to migrate the embedding column from ARRAY(Float) to pgvector vector(1024) and create an HNSW index so that vector similarity queries execute efficiently in the database.",
+      "acceptanceCriteria": [
+        "新建 backend/alembic/versions/006_migrate_embedding_to_pgvector.py，down_revision='ed9e5b053f15'",
+        "upgrade() 执行 CREATE EXTENSION IF NOT EXISTS vector",
+        "upgrade() 执行 ALTER TABLE job_embeddings ALTER COLUMN embedding TYPE vector(1024) USING embedding::double precision[]::vector(1024)",
+        "upgrade() 创建 HNSW 索引 idx_job_embeddings_embedding_cosine WITH (m=16, ef_construction=200, vector_cosine_ops)",
+        "downgrade() 删除索引并恢复为 double precision[] 类型",
+        "运行 alembic upgrade head 成功，无报错",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "使用 op.execute(raw_sql) 而非 alembic alter_column，因为 pgvector 是非标准类型"
+    },
+    {
+      "id": "US-002",
+      "title": "注册 pgvector 类型到 asyncpg + 更新 JobEmbedding 模型",
+      "description": "As a developer, I need to register the pgvector Vector type codec with asyncpg and update the ORM model so that list[float] values are transparently encoded/decoded as vector(1024).",
+      "acceptanceCriteria": [
+        "session.py 导入 pgvector.asyncpg.register_vector 和 sqlalchemy.event",
+        "session.py 添加 @event.listens_for(engine.sync_engine, 'connect') 事件监听器，在 dbapi_connection 上调用 register_vector",
+        "job_embedding.py 将 ARRAY(Float) 改为 pgvector.sqlalchemy.Vector(1024)",
+        "移除 ARRAY 和 Float 的导入",
+        "启动 dev server 无 asyncpg 类型相关报错",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "依赖 US-001 迁移先执行。pgvector>=0.3.0 已在 pyproject.toml 中声明"
+    },
+    {
+      "id": "US-003",
+      "title": "改造 retriever.py 使用 SQL 端余弦距离查询",
+      "description": "As a developer, I want the retriever to compute cosine similarity via pgvector's <=> operator in SQL instead of loading all embeddings into Python memory, so that vector search scales with data growth.",
+      "acceptanceCriteria": [
+        "retrieve_jobs() 使用 JobEmbedding.embedding.cosine_distance(literal(user_embedding, type_=Vector(1024))) 生成 SQL <=> 操作符",
+        "向量相似度公式为 1.0 - cosine_distance（距离转相似度）",
+        "SQL 查询 JOIN job_postings 与 job_embeddings，过滤 is_active=True 和城市",
+        "关键词评分保留在 Python 端（0.6*vec + 0.4*kw 合并），_keyword_score 函数不变",
+        "删除 _cosine_similarity() 函数",
+        "发送技能搜索请求，正常返回匹配岗位且无报错",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "依赖 US-002 的 Vector 类型注册。ingestor.py 无需改动 — list[float] 经 codec 自动转换"
+    },
+    {
+      "id": "US-004",
+      "title": "重写 generate_embeddings.py 为异步版本",
+      "description": "As a developer, I need to rewrite the embedding generation script to use async_session + SQLAlchemy ORM instead of the psycopg2 workaround, since asyncpg now correctly handles Vector type.",
+      "acceptanceCriteria": [
+        "移除所有 psycopg2 导入和手动 DSN 解析代码",
+        "使用 async_session + SQLAlchemy ORM（select(JobPosting)、select(JobEmbedding)）",
+        "使用 db.add(JobEmbedding(...)) 写入，每 10 条 await db.commit()",
+        "--force 参数使用 text() 执行 DELETE...WHERE job_posting_id = ANY(:ids) 清除已有 embedding",
+        "运行 python backend/scripts/generate_embeddings.py --limit 5 成功生成 5 条 embedding 且无报错",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "依赖 US-002。原脚本在 backend/scripts/generate_embeddings.py"
+    },
+    {
+      "id": "US-005",
+      "title": "创建 migrate_and_start.bat 一键启动脚本",
+      "description": "As a developer, I want a one-click startup script that runs database migrations before starting the backend server, so migrations are never forgotten.",
+      "acceptanceCriteria": [
+        "新建 backend/migrate_and_start.bat",
+        "脚本执行 cd /d %~dp0 切换到 backend 目录",
+        "运行 alembic upgrade head，失败则 echo 错误并 pause 后 exit /b 1",
+        "迁移成功后启动 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+        "脚本可重复执行（已是最新迁移时 alembic 自动跳过）",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "无依赖，可独立执行。纯脚本文件，不涉及 Python 代码"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# Ralph Progress Log
+Started: Thu May  8 18:30:00     2026
+
+## Codebase Patterns
+- PostgreSQL 驱动: asyncpg（通过 create_async_engine + async_sessionmaker）
+- pgvector Docker 镜像: pgvector/pgvector:pg16
+- pgvector Python 库: pgvector>=0.3.0（已在 pyproject.toml）
+- Vector 类型注册: pgvector.asyncpg.register_vector + SQLAlchemy event.listen(engine.sync_engine, "connect")
+- 迁移使用 raw SQL: op.execute() 而非 alembic alter_column（pgvector 非标准类型）
+- ORM 查询: scalars().all() 获取 ORM 实例，.all() 获取 Row 对象
+- DeepSeek API: httpx.AsyncClient + settings.CONTENT_API_KEY

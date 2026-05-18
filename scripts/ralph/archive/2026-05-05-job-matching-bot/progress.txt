@@ -1,0 +1,145 @@
+# Ralph Progress Log
+Started: 2026-05-04
+---
+
+## Codebase Patterns
+- Backend: FastAPI + SQLAlchemy async (asyncpg) + PostgreSQL + pgvector
+- Frontend: React 19 + TypeScript + TailwindCSS 4 + Vite
+- Database models in `backend/app/models/` using SQLAlchemy declarative base with BaseMixin (id, created_at, updated_at)
+- API routers in `backend/app/api/` with FastAPI APIRouter, prefix `/api/...`
+- Alembic migrations in `backend/alembic/versions/`
+- Frontend state: localStorage for conversations/messages persistence
+- Vite proxy forwards `/api` to backend port 8000
+- Backend lint: ruff with B008 ignored (FastAPI Depends pattern)
+- Frontend: TypeScript strict mode, `tsc --noEmit` for typecheck
+- Dark theme CSS custom properties in `src/index.css`
+- Ralph script at `scripts/ralph/ralph.sh` reads `prd.json` from same directory
+- Scraper pattern: Playwright Chromium with stealth scripts, TokenBucket rate limiter, RobotsChecker for robots.txt compliance, exponential backoff retry
+- `app/utils/` for shared utilities (rate_limiter, robots_checker)
+- Scrapers in `app/services/` with best-effort fallback to mock data in chat_service
+- mcp-bosszp vendor at `backend/vendor/mcp-bosszp/` — Boss直聘 official API via MCP
+- MCP subprocess managed by `BossMCPClient` with HTTP streamable-http transport (JSON-RPC 2.0)
+- Cookie persistence to `backend/vendor/mcp-bosszp/cookie.json` — auto-loaded on startup
+- Login state machine: UNKNOWN → LOGGING_IN → WAITING_FOR_SCAN → LOGGED_IN / EXPIRED
+- JinriZhaopinScraper: Playwright headful Chrome with 10 fingerprints, ghost-cursor, 超级鹰 CAPTCHA, 100条/30秒铁律
+- 旧 prd.json (job-matching-bot, US-001~US-020) 已归档至 archive/2026-05-04-job-matching-bot/
+
+---
+
+## 2026-05-04 - US-001: 创建 JinriZhaopinScraper 爬虫核心类骨架
+- 新建 backend/app/services/jinrizhaopin_scraper.py (856行)
+- ScrapedJob 类与 today_job_scraper 完全兼容
+- 100条上限 + 30±5秒间隔不可配置
+- CSS选择器解析（非绝对XPath）：列表页+详情页全部字段
+- 修复6个旧版bug：charge_pos≠person_in_charge、location前缀剥离、bounds checking、面议→0,0、scale_mapping保留、create_time安全索引
+- _save_job() upsert by (source, source_id) → JobPosting + normalize_city
+- TokenBucket(0.5 QPS) + RobotsChecker + 屏蔽页检测
+- 复用 _parse_salary / _extract_skills from today_job_scraper
+- ruff check passes
+
+**Learnings:**
+- jrzp.com 使用 ASP.NET aspx 页面，列表URL: /main/job/moreJob.aspx?jobs=19_45&px=0&page=N
+- ScrapedJob 必须与 today_job_scraper.ScrapedJob 属性名保持一致（_to_job_item_from_scraped duck-type）
+- ruff SIM105 要求 try/except/pass → contextlib.suppress
+
+---
+
+## 2026-05-04 - US-002: 10套预设指纹与隐身脚本注入
+- 新增 Fingerprint 数据类(viewport/device_scale_factor/hardware_concurrency/device_memory/platform/gpu_vendor/gpu_renderer/canvas_noise)
+- FINGERPRINTS 常量10套: 6 Windows (UHD620/RTX3060/HD520/IrisXe/RX580/GTX1660/UHD770) + 3 macOS (M1/M2) + 1 Linux(备用)
+- 每套含独立 canvas_noise 种子(random 0.0001-0.0003)
+- _pick_fingerprint() + _pick_ua(platform): UA池22条按platform分组(Win/Mac/Linux)
+- _build_browser_context(): 返回(browser, context)，携带完整指纹（viewport/scale/UA/locale/timezone/proxy）
+- _apply_stealth() 重写为增强版:
+  - WebRTC: RTCPeerConnection 覆盖(iceServers→stun only)
+  - Canvas: toDataURL 注入 noiseLevel 级噪声
+  - WebGL: getParameter(37445/37446) 返回指纹GPU信息
+  - Client Hints: Sec-CH-UA/Sec-CH-UA-Mobile/Sec-CH-UA-Platform HTTP头
+  - hardwareConcurrency/deviceMemory/platform 对齐指纹
+  - permissions.query 全部返回 prompt
+- scrape() 改用 _pick_fingerprint() + _build_browser_context() + _apply_stealth(page, fp)
+- ruff check passes
+
+**Learnings:**
+- Playwright BrowserContext 创建后无法获取 parent Browser，需保存浏览器引用
+- F-string 注入 JS 时注意 Python 花括号需转义为 {{ }}
+- ruff E501: JS内联字符串超120列，拆分变量赋值可解决
+
+---
+
+## 2026-05-04 - US-003: 键入和滚动行为仿真
+- _type_search_keyword 增强: 逐字键入80-200ms，调用_type_with_typo
+- _type_with_typo: 10%概率错误→300ms→Backspace→正确
+- _nearby_key: QWERTY键盘26字母邻近键映射
+- _human_scroll: 8-15步+噪声±20px+10%回滚30-80px
+- _browse_homepage: 2-3分钟(随机滚动+悬浮卡片+回顶)
+- scrape() keyword循环前调用_browse_homepage()
+- ruff check passes
+
+**Learnings:**
+- page.evaluate("window.scrollBy") 同步执行，无需 await
+- page.keyboard.press 支持 delay 参数(ms)实现逐字键入
+
+---
+
+## 2026-05-04 - US-004: 贝塞尔鼠标仿真和阅读行为
+- ghost-cursor PyPI不可用→用Playwright mouse.move+二次贝塞尔插值
+- _bezier_mouse_move: 控制点随机偏移±40-80px + 微抖动±2px + 距离自适应步数(近4-10/中10-20/远20-35) + 5%过冲回正
+- _idle_mouse_movements: 概率分配(30%微动+20%点空白+50%发呆)
+- _hover_card: bounding_box→贝塞尔移动→hover 3-8s
+- _return_to_list_and_browse: 回顶→慢浏览→回顶
+- _simulate_30s_reading重写: 分4阶段(滚下5-8s+停2-4s+滚上5-8s+发呆剩余时间)
+- scrape()每3-5条记录调用_return_to_list_and_browse
+- ruff check passes
+
+**Learnings:**
+- ghost-cursor 在 PyPI 上不存在(无匹配分发)，需自实现贝塞尔鼠标
+- Playwright page.mouse 无 position 属性，需用 viewport_size 估算起始点
+- datetime.now() 计时比 time.time() 更可靠(同步IO场景)
+
+---
+
+## 2026-05-04 - US-005: 验证码处理 (超级鹰集成)
+- _detect_captcha: 3类检测(滑块/点选/文字关键词匹配)
+- _solve_captcha: 截图base64→超级鹰API→滑块ghost-cursor拖拽(加速-减速-过冲) / 点选坐标±3px
+- _chaojiying_api: httpx POST upload.chaojiying.net, codetype 9900/9006/1902
+- 3次CAPTCHA触发_cooldown+_save_cooldown_flag
+- ruff check passes
+
+---
+
+## 2026-05-04 - US-006: 风控检测与应急系统
+- _detect_block增强: 空页面(<50字符+无job元素蜜罐检测) + HTTP 403/429/503 + 12关键词
+- _detect_shadowban: 结果≤1→搜'销售'交叉验证→仍≤1确认shadowban
+- _handle_block分类: captcha→solve/shadowban→destroy+24h/security_risk→destroy+7d/rate_limit→cooldown5min
+- _save_cooldown_flag: 写 .jrzp_cooldown 持久化标记
+- ruff check passes
+
+---
+
+## 2026-05-04 - US-007: 批量填充脚本
+- backend/scripts/populate_jinrizhaopin.py
+- CLI: --keywords(Python/Java/前端/数据分析/测试/运维) --cities(8城市) --proxy --dry-run --max-results
+- max可传入但 min(args.max_results, 100) 强制上限
+- --dry-run 用 monkey-patch JinriZhaopinScraper._save_job → lambda: False
+- 运行汇总: Scraped/Duration/CAPTCHAs/Blocks/Cooldown
+- ruff check passes
+
+---
+
+## 2026-05-04 - US-008: 配置项和代码引用更新
+- config.py: 新增 JRZP_PROXY/JRZP_CAPTCHA_USER/JRZP_CAPTCHA_PASS
+- __init__.py: 新增 JinriZhaopinScraper export
+- chat_service.py 中 TodayJobScraper 实时 fallback 保留不变
+- 旧 today_job_scraper.py 和 JrzpSpider-master/ 保留不动
+- ruff check passes
+
+**Learnings:**
+- ruff F541: f-string without placeholders → 改用普通字符串
+- monkey-patch staticmethod 需用 staticmethod() 包装 lambda
+---
+
+
+
+
+

@@ -1,0 +1,14 @@
+# Ralph Progress Log
+Started: Fri May  8 17:00:00     2026
+
+## Codebase Patterns
+- 所有 LLM 调用使用 httpx 直连 OpenAI 兼容端点（无 SDK 依赖）
+- 查询改写使用本地 Ollama 部署的 deepseek-r1:7b-qwen-distill-q4_K_M（端口 11434）
+- 每个新模块必须有降级策略：失败时不得影响搜索可用性
+- pgvector 迁移已在上一个 ralph run 完成（ralph/pgvector-migration，已归档）
+- embed server 当前离线，BGE-M3 需通过 Docker Compose 新增服务部署
+- 数据库 URL 使用 asyncpg 驱动，migrations 需同步连接
+- Typecheck 要求所有函数有返回类型注解（disallow_untyped_defs = true）
+- 前后端隔离：只修改 backend/ 和 infra/，绝不碰 frontend/
+- 三个 LLM API key（CODE_PLANNER/CODE_GENERATOR/CODE_EVALUATOR）当前均为死配置
+- FlashRank 本地重排模型无需 GPU，适合 6GB 显存环境

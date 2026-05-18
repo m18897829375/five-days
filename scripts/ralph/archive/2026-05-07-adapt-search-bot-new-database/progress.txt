@@ -1,0 +1,125 @@
+# Ralph Progress Log
+Started: 2026-05-06 10:53:36
+---
+
+## Codebase Patterns
+- Backend: FastAPI + SQLAlchemy async (asyncpg) + PostgreSQL + pgvector
+- Ruff for linting: `cd backend && ruff check .`
+- chat_service.py `search_jobs()` is the main job search orchestrator
+- MCP client (boss_mcp_client.py) still exists but is no longer called from search pipeline
+
+---
+
+## 2026-05-06 11:00 - US-001
+- Removed `_search_with_retry_mcp()` call from `search_jobs()` in chat_service.py
+- Updated docstring: 4-step flow (scrapers → RAG → DB)
+- `_search_with_retry_mcp()` function definition kept intact for future restoration
+- ruff check passes
+
+**Learnings:**
+- The BOSS MCP search was Step 0, now scraper is Step 1
+- MCP client import and LoginState check remain functional — just not wired in
+---
+
+## 2026-05-06 11:10 - US-002
+- Changed `_fetch_jobs_from_db()` to use `is_active.is_(True)` instead of `status == "active"`
+- Changed `city.in_(cities)` to `city_normalized.in_(normalized_cities)` with `normalize_city()` preprocessing
+- Added `from app.utils.city_utils import normalize_city` import
+- ruff check passes
+
+**Learnings:**
+- SQLAlchemy boolean columns need `.is_(True)` not `== True` to satisfy ruff E712
+- `city_normalized` field already exists on JobPosting, populated by scrapers at insert time
+---
+
+## 2026-05-06 12:00 - US-005
+- Changed `run_job_validity_check()` query from `status == "active"` to `is_active.is_(True)`
+- Added BOSS直聘 skip logic: jobs with `source == "BOSS直聘"` skip HTTP check entirely, only update `last_checked_at`
+- Non-BOSS sources continue with existing HTTP status code checking
+- When marking jobs expired, now set both `is_active=False` AND `status="expired"`
+- Changed `get_fresh_jobs_count()` to use `is_active.is_(True)` + `city_normalized.in_(normalized_cities)` with `normalize_city()` preprocessing
+- Added `from app.utils.city_utils import normalize_city` import
+- ruff check passes
+
+**Learnings:**
+- BOSS直聘 jobs are checked separately by CDP browser script (US-006), so `job_monitor` must skip them to avoid false positive expirations
+- Refactored the loop to open one DB session per job (was already per-job) and do the BOSS skip check before HTTP call, avoiding unnecessary network requests
+- `get_fresh_jobs_count()` signature unchanged — callers in monitor_router.py don't need updates
+---
+
+## 2026-05-06 12:15 - US-003
+- Changed `retrieve_jobs()` in `backend/app/rag/retriever.py`: `JobPosting.status == "active"` → `JobPosting.is_active.is_(True)`
+- Changed `JobPosting.city.in_(cities)` → `JobPosting.city_normalized.in_(normalized_cities)` with `normalize_city()` preprocessing
+- Added `from app.utils.city_utils import normalize_city` import
+- ruff check passes
+
+**Learnings:**
+- Same pattern as US-002 and US-005 — `is_active.is_(True)` + `city_normalized.in_(normalized_cities)` with `normalize_city()`
+- `retrieve_jobs()` was the last query still using the old `status == "active"` and raw `city` field
+---
+
+## 2026-05-06 12:30 - US-004
+- Added `or_` import from sqlalchemy to chat_service.py
+- Changed `clean_expired_recommendations()` query: `status == "expired"` → `or_(status == "expired", is_active.is_(False))`
+- This ensures jobs deactivated via `is_active=False` are also cleaned from the recommendation pool
+- ruff check passes
+
+**Learnings:**
+- Use `is_active.is_(False)` for SQLAlchemy boolean False checks to avoid ruff E712
+- `clean_expired_recommendations()` is called from `search_jobs()` (line 397) at the start of each search for a conversation
+- The function removes RecommendedURL entries whose JobPosting is expired/deactivated, freeing up slots for new recommendations
+---
+
+## 2026-05-06 14:00 - US-006
+- Created `backend/scripts/check_boss_urls.py` — CDP browser checker for BOSS直聘 job URL validity
+- Connects to Chrome via patchright CDP at `http://localhost:9222`
+- Queries `source='BOSS直聘'` + `is_active=True` jobs from DB
+- Opens each URL in browser, waits 2.5s for render, checks page text for "职位已关闭"
+- Closed jobs: `is_active=False` + `status='expired'`; normal jobs: keep `is_active=True`
+- Both cases update `last_checked_at` timestamp
+- Random 3-5s delay between URL checks for anti-detection
+- Supports `--limit N` and `--dry-run` (detect only, no DB writes)
+- Batch DB update after all checks complete (single commit)
+- ruff check passes
+
+**Learnings:**
+- Script uses `sync_playwright` for CDP + `asyncio.new_event_loop()` for async DB operations, consistent with other scripts like `populate_cdp2.py`
+- `page.content()` captures full rendered HTML/text, sufficient for detecting "职位已关闭" text indicator
+- `Page.goto(wait_until="domcontentloaded")` with 2.5s extra sleep gives JS time to render dynamic content
+- Error handling per-URL prevents one bad URL from crashing the entire batch
+---
+
+## 2026-05-06 14:30 - US-007
+- Added `_apply_recommendation_filters(jobs, user_cities, min_salary_threshold)` function to `chat_service.py`
+- Three-tier cascade: strict match (city+salary) → city-only fallback → full return with hint
+- City filtering uses `normalize_city()` on `JobItem.city` field (since JobItem has no city_normalized)
+- Salary threshold: `MIN_SALARY_THRESHOLD = 10000` (月薪最低阈值)
+- Integrated into `search_jobs()` post-processing, replacing manual `_sort_jobs()` call
+- Fallback message appended to ChatResponse.message for user transparency
+- ruff check passes
+
+**Learnings:**
+- JobItem schema has `city` (raw) but not `city_normalized` — must normalize at filter time via `normalize_city(job.city)`
+- `_sort_jobs()` is reused inside the filter function (not duplicated) — sorts by salary_max desc, puts 0-salary jobs last
+- When user doesn't specify cities, city filtering is skipped entirely (keeps all jobs for salary-only filtering)
+- The filter function returns `tuple[list[JobItem], str]` — caller composes the final message
+---
+
+## 2026-05-06 15:00 - US-008
+- Changed `BOSS_MCP_ENABLED` default from `True` to `False` in config.py
+- Wired `boss_mcp_client` global singleton to `settings.BOSS_MCP_ENABLED` and `settings.BOSS_MCP_PORT` — MCP now properly disabled via config
+- `BossMCPClient.start()` already checks `self.enabled` and skips subprocess launch when disabled, so no changes needed in main.py lifespan
+- Changed `main.py` scheduler interval from `JOB_MONITOR_INTERVAL_MINUTES` to `JOB_ACTIVE_CHECK_INTERVAL_HOURS * 60` (converts hours to minutes for APScheduler)
+- ruff check passes
+
+**Learnings:**
+- Module-level singleton with settings import at top of file works fine — no circular import issues since config.py has no app imports
+- The `JOB_MONITOR_INTERVAL_MINUTES` config is now superseded by `JOB_ACTIVE_CHECK_INTERVAL_HOURS` for the scheduled validity check — the old field remains in config.py but is no longer referenced by the scheduler
+- APScheduler's `add_job(interval, minutes=X)` expects minutes, so `hours * 60` is the correct conversion
+---
+
+## 2026-05-06 15:15 - ALL STORIES COMPLETE
+- US-001 through US-008 all implemented and verified
+- PRD updated: all `passes` set to `true`
+- Branch `ralph/adapt-search-bot-new-database` ready for merge
+---

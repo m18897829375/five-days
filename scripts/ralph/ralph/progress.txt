@@ -1,0 +1,220 @@
+# Ralph Progress Log
+Started: Fri May  8 21:52:25     2026
+
+## Codebase Patterns
+- Backend: FastAPI + SQLAlchemy async (asyncpg) + PostgreSQL + pgvector
+- Frontend: React 19 + TypeScript + TailwindCSS 4 + Vite
+- Docker services in `infra/docker-compose.yml` (postgres, redis, minio, backend, frontend, embed)
+- Backend config in `backend/app/core/config.py` — Pydantic Settings with env vars
+- EMBED_BASE_URL defaults to `http://localhost:8001`, EMBED_DIMENSIONS=1024
+- embedder.py: tries embed server first, falls back to keyword pseudo-vectors
+- BGE-M3 model via sentence-transformers in Docker container
+- SQLAlchemy `select(Entity)` returns `Result[tuple[Entity]]`; use `.scalars().all()` to get `list[Entity]` for type-safe attribute access
+- HNSW indexes via `op.execute("CREATE INDEX ... ON ... USING hnsw (...) WITH (...)"` in Alembic — cannot use SQLAlchemy ORM declarations
+
+---
+
+## 2026-05-08 22:10 - US-001: 添加 BGE-M3 Embedding 服务到 Docker Compose
+- 新建 infra/embed/server.py — BGE-M3 FastAPI 嵌入服务（/embeddings 端点，OpenAI 兼容格式）
+- 新建 infra/embed/Dockerfile — Python 3.11-slim + sentence-transformers + FastAPI
+- 新建 infra/embed/requirements.txt — sentence-transformers, fastapi, uvicorn
+- 更新 infra/docker-compose.yml — 新增 embed 服务（端口 8001, 模型缓存卷, healthcheck + start_period 120s）
+- Typecheck (mypy) 通过
+
+**Learnings:**
+- BGE-M3 默认输出 1024 维向量，与现有 EMBED_DIMENSIONS=1024 一致
+- embedder.py 已预留 /embeddings 端点调用，格式兼容 OpenAI API
+- embed 服务模型约 2GB，首次启动需下载（healthcheck start_period=120s 足够）
+
+---
+
+## 2026-05-08 22:35 - US-002: 更新 embedder.py 适配 BGE-M3 服务并添加重试
+- 修改 backend/app/rag/embedder.py：model 参数从 "embed" 改为 "bge-m3"（匹配 BGE-M3 服务输入格式）
+- 添加重试逻辑：MAX_RETRIES=2，共 3 次尝试，每次间隔 0.5s
+- timeout=10s 保持不变（在 httpx.AsyncClient 中）
+- _keyword_fallback() 作为最终降级保留
+- 添加 `from typing import cast` 修复 mypy warn_return_any 错误
+- Typecheck (mypy) + Lint (ruff) 通过
+
+**Learnings:**
+- embedder.py 原来 model="embed" 与 BGE-M3 服务期望 model="bge-m3" 不匹配
+- mypy warn_return_any=true 时，从 resp.json() 返回的 Any 需要 cast
+- 重试逻辑使用简单 for 循环 + asyncio.sleep(0.5)，无需额外重试库
+
+---
+
+## 2026-05-08 22:55 - US-003: 全量重建嵌入向量
+- 新建 backend/scripts/generate_embeddings.py — 全量嵌入重建脚本
+- 预检：启动前 ping embed server /health 端点，不可用则退出
+- 主流程：遍历所有 active 岗位，调用 embed_text() 生成 BGE-M3 1024 维真实向量
+- Python 端 upsert：已存在的 job_posting_id → UPDATE，否则 INSERT（ON CONFLICT DO UPDATE 语义）
+- 后验证：COUNT 一致性检查 + 随机采样 10 条检测伪向量
+- 伪向量检测：真 BGE-M3 向量有 >> 5 个唯一值，伪向量仅含 {0.0, 0.1, 1.0}
+- ruff 通过（0 issues），mypy 仅 pgvector 预存 stub 问题（非新引入）
+- 用法: cd backend && python -m scripts.generate_embeddings
+
+**Learnings:**
+- job_embeddings 表无 job_posting_id 唯一约束，无法用数据库 ON CONFLICT，改 Python 端判断
+- _keyword_fallback 产生的伪向量特征：唯一值 <= 5，且全部来自 {0.0, 0.1, 1.0}
+- 脚本需先用 httpx 探测 embed server 健康状态，避免全量回退到 keyword fallback
+
+---
+
+## 2026-05-08 23:15 - US-004: 配置 HNSW ef_search 查询参数
+- 修改 backend/app/rag/retriever.py：在 retrieve_jobs() 开头添加 `await db.execute(text("SET hnsw.ef_search = 100"))` 及 `from sqlalchemy import text`
+- 更新 prd.json：US-004 passes 设为 true
+- ruff 0 issues，mypy 仅预存 pgvector stub 问题（非新引入）
+
+**Learnings:**
+- hnsw.ef_search 是 pgvector 会话级参数，默认值为 1，增大可提升召回率但增加查询延迟
+- 该参数只影响 HNSW 索引扫描，不影响普通 SQL 查询，天然满足"不影响其他数据库操作"的要求
+- 当前 retriever 使用 Python 端余弦相似度，ef_search 在后续改为 pgvector <=> 算子查询时生效
+- 使用 `text()` 执行原始 SET 命令是最简洁的方式，无需额外连接或事务管理
+
+---
+
+## 2026-05-08 23:45 - US-005: 添加查询改写（Query Rewriting）
+- 新建 backend/app/rag/query_rewriter.py — httpx 调用 Ollama API (localhost:11434) 的 deepseek-r1:7b-qwen-distill-q4_K_M 模型
+- 系统 prompt 将技能列表改写为自然语言岗位搜索查询
+- 处理 DeepSeek-R1 推理模型的  response... 标记
+- 改写失败时降级为 " ".join(skills)，不影响正常搜索
+- 修改 retriever.py — 添加 query_text 可选参数，允许外部传入改写后的查询
+- 修改 chat_service.py — 在 RAG 检索前调用 rewrite_query()，传入改写查询
+- ruff 0 issues，mypy 仅预存问题通过
+
+**Learnings:**
+- DeepSeek-R1 推理模型输出包含  response... 标记，需去除后才能得到纯净结果
+- Ollama API `/api/generate` 端点（非 `/chat`），使用 system prompt 时需同时传 system 和 prompt 字段
+- query_rewriter 作为独立模块，方便后续 HyDE (US-006) 复用改写逻辑
+- retriever.py 新增 query_text 可选参数（默认 None），兼容旧调用方式
+
+---
+
+## 2026-05-08 23:50 - US-006: 添加 HyDE 假设文档嵌入
+- 新建 backend/app/rag/hyde.py — 使用 Ollama deepseek-r1:7b 从技能列表生成假设岗位描述(200-400字)
+- HyDE 系统 prompt 要求输出中文自然语言段落描述
+- DeepSeek-R1 输出清洗（去除  think... 标记）
+- HyDE 生成失败返回空字符串，调用方据此降级
+- 修改 chat_service.py Step 2：HyDE 优先 → query_rewriter 降级 → 原始技能拼接（retriever fallback）
+- ruff 0 issues，mypy 仅预存问题通过
+
+**Learnings:**
+- HyDE 与 query_rewriter 使用同一个 Ollama 模型，架构一致
+- HyDE 模块设计为独立模块，返回空字符串表示失败，由调用方决定降级策略
+- chat_service.py 中 HyDE 优先于 query_rewriter：假设文档的嵌入向量在语义空间中更接近真实 JD
+- 降级链：HyDE → query_rewriter → " ".join(skills)（retriever.py 内置默认值）
+
+---
+
+## 2026-05-08 23:20 - US-007: 实现多向量表示 — Title/Skills/Description 分嵌
+- 新建 backend/alembic/versions/006_add_multivector_columns.py — Alembic 迁移：新增 title_embedding/skills_embedding Vector(1024) 列、回填旧数据（复制 embedding 值）、创建 HNSW 索引（m=16, ef_construction=200, vector_cosine_ops）
+- 更新 backend/app/models/job_embedding.py — 新增 title_embedding 和 skills_embedding Mapped[list[float] | None] 字段
+- 更新 backend/app/rag/ingestor.py — 分别生成三个嵌入：embedding=embed(description)、title_embedding=embed(title)、skills_embedding=embed(skills)
+- 更新 backend/app/rag/retriever.py — 新增 _multi_vector_score() 函数，按 0.5:0.3:0.2 加权合并 desc/title/skills 余弦相似度；多向量列未填充时自动降级为单向量模式
+- ruff 0 issues，mypy 仅预存问题（pgvector stub + ingestor rowcount）
+- 旧单向量 embedding 列保留以兼容
+
+**Learnings:**
+- SQLAlchemy `select(Entity)` 返回 `Result[tuple[Entity]]`，需要 `.scalars().all()` 才能获得 `list[Entity]` 类型（否则 mypy 报 arg-type 不匹配）
+- HNSW 索引通过 alembic 的 `op.execute()` 执行原始 SQL 创建，无法通过 SQLAlchemy ORM 声明
+- 多向量降级模式：检查 `title_embedding is not None and skills_embedding is not None`，任一为 None 即回退到单向量 legacy 模式
+- ingestor 中当 skills 为空列表时，skills_embedding 设为 None（不调用 embed server）
+
+---
+
+## 2026-05-08 23:40 - US-008: HNSW 索引参数优化为 m=24, ef_construction=300
+- 新建 backend/alembic/versions/007_optimize_hnsw_index_params.py — Alembic 迁移
+- upgrade: DROP IF EXISTS 三个旧 HNSW 索引 → 用 m=24, ef_construction=300 重建
+- 三个索引: idx_job_embeddings_embedding_cosine (单向量), idx_job_embeddings_title_embedding_cosine, idx_job_embeddings_skills_embedding_cosine
+- downgrade: 恢复为 m=16, ef_construction=200 参数
+- ef_search=100 已在 US-004 retriever.py 中设置，无需额外修改
+- ruff 0 issues，mypy 仅预存问题（非新引入）
+
+**Learnings:**
+- pgvector HNSW 索引 m 控制每层连接数（越大召回越高但内存越大），ef_construction 控制构建时搜索深度（影响构建速度和最终索引质量）
+- 当前 retriever.py 使用 Python 端余弦相似度（而非 pgvector <=> 算子），索引在 Python 端遍历所有候选时仍有效（加速 KNN 查找）
+- 迁移使用 DRY 循环：INDEXES 列表 + COLUMN_FOR 映射字典，避免重复代码
+
+---
+
+## 2026-05-08 23:55 - US-009: 添加 FlashRank 重排序
+- 新建 backend/app/rag/reranker.py — FlashRank 交叉编码器重排序模块
+  - 使用 flashrank.Ranker 延迟加载 ms-marco-MiniLM-L-12-v2 模型
+  - rerank(query, passages) 返回 [(original_index, score), ...] 按相关性降序排列
+  - flashrank 未安装或重排失败时降级为原始排序（identity ordering）
+- 更新 backend/app/rag/retriever.py — 集成重排序流程
+  - 新增 COARSE_LIMIT=30 和 _make_passage() 辅助函数
+  - 检索流程：粗筛评分 → top-30 → 构建 passage(title + desc[:400]) → FlashRank → top-limit
+- 更新 backend/pyproject.toml — 添加 flashrank>=0.2.0 依赖
+- ruff 通过（0 issues），mypy 仅 import-untyped stub 问题（flashrank + pgvector 预存）
+- 降级链：FlashRank → 原始粗筛排序（reranker 内建的 identity fallback）
+
+**Learnings:**
+- FlashRank 的 Ranker.rerank(query, passages) 返回 [{"text", "score"}, ...] 已按 score 降序
+- 模型约 200MB，首次加载 < 2s（ms-marco-MiniLM-L-12-v2 是轻量级交叉编码器）
+- passage 格式为 f"{title}: {desc[:400]}" — 过长 content 对交叉编码器无益且浪费计算
+- flashrank 包无 py.typed marker，mypy 报 import-untyped（同一类别预存问题）
+- reranker 作为 retriever 内部阶段，不暴露给 chat_service.py（chat_service 仅调用 retrieve_jobs）
+
+---
+
+## 2026-05-09 00:05 - US-010: 添加 Redis 语义缓存
+- 新建 backend/app/rag/cache.py — Redis 语义缓存模块
+  - 延迟连接 redis.asyncio，Redis 不可用时自动降级为 None
+  - 嵌入缓存: key=rag:emb:{md5(sorted_skills)}, value=JSON向量, TTL=1h
+  - 结果缓存: key=rag:result:{md5(skills|cities)}, value=JSON JobItem列表, TTL=10min
+- 更新 embedder.py — embed_text() 新增 skills 可选参数
+  - skills 传入时先查 get_cached_embedding，命中直接返回
+  - embed server 成功后调用 set_cached_embedding 写入缓存
+- 更新 retriever.py — retrieve_jobs() 集成结果缓存
+  - 检索前调用 get_cached_result，命中则直接返回缓存结果
+  - 检索完成后调用 set_cached_result 写入缓存
+- ruff 0 issues，mypy 仅预存 stub 问题（flashrank + pgvector import-untyped）
+
+**Learnings:**
+- redis.asyncio.from_url() 返回的 Redis 实例在 redis 5.x 中，方法返回 `Awaitable[T] | T`，await 时需 `# type: ignore[misc]`
+- 结果缓存使用 JobItem.model_dump() 序列化，取用时 JobItem(**item) 反序列化
+- 缓存 key 必须基于排序后的技能列表以确保幂等性（相同技能不同顺序产生相同 key）
+- embed_text 的缓存 key 基于 skills 而非 text（因为同一组技能无论经过 HyDE/rewrite 都应该命中同一嵌入缓存）
+
+---
+
+## 2026-05-09 00:15 - US-011: 实现查询分解 + RRF 融合
+- 新建 backend/app/rag/query_decomposer.py — 查询分解与 RRF 融合模块
+  - decompose_and_search(): 技能数 >= 3 时分解为独立查询，每技能独立调用 retrieve_jobs
+  - _rrf_fusion(): RRF 公式 score = Σ 1/(k + rank)，k=60
+  - 单技能时直接透传 retrieve_jobs，不分解
+- 更新 backend/app/services/chat_service.py Step 2:
+  - skills >= 3 → 查询分解 + RRF 融合（跳过 HyDE/rewrite，因每技能独立搜索）
+  - skills < 3 → 保持原有 HyDE → rewrite → retrieve_jobs 流程
+- ruff 0 issues，mypy 仅预存 flashrank/pgvector stub 问题
+
+**Learnings:**
+- RRF 使用 job.url 作为去重 key，同一 URL 在不同子查询中出现时累加分数
+- 分解路径与 HyDE/rewrite 路径互斥：多技能不需要 HyDE（每技能本身已是精准关键词）
+- query_decomposer 内部调用 retrieve_jobs，保持缓存/重排序等下游优化生效
+
+---
+
+## 2026-05-09 01:30 - US-012: 建立 RAGAS 评估体系
+- 新建 backend/tests/eval/ 目录：__init__.py, eval_queries.json, run_eval.py
+- eval_queries.json: 20 条典型查询（单技能/多技能/中文/英文/混合/城市/高薪），每条手工标注 3-5 个真实相关岗位 URL
+- run_eval.py: 一键评估脚本，支持两种指标模式
+  - 传统 IR 指标（始终可用，无外部依赖）：Precision@3/5/10, Recall@3/5/10, MRR, MAP, NDCG@5/10
+  - RAGAS 指标（需 pip install ragas openai datasets）：Context Precision, Context Recall, Faithfulness, Answer Relevancy — 使用 DeepSeek API 作为评估器 LLM
+  - LLM 答案生成：via httpx → DeepSeek chat completions
+  - 输出：JSON 报告（eval_results/）+ 控制台摘要（含平均值/中位数/最小值/最大值及 P95 延迟）
+- 更新 backend/pyproject.toml：新增 [project.optional-dependencies] eval 组（ragas>=0.2.0, openai>=1.0.0, datasets>=2.0.0）
+- ruff lint: 0 issues（新增 per-file-ignores: tests/**/*.py = [E402]）
+- mypy typecheck: 0 issues（--ignore-missing-imports，因 ragas/datasets 为可选依赖）
+- 用法: cd backend && pip install -e ".[eval]" && python -m tests.eval.run_eval
+
+**Learnings for future iterations:**
+- 传统 IR 指标（Precision/Recall/MRR/MAP/NDCG）无需外部依赖，可实现零成本评估基线
+- RAGAS 需要 langchain + openai 传递依赖，作为可选 eval 依赖组避免污染运行时环境
+- eval_queries.json 中的 relevant_urls 必须来自数据库真实 URL，否则召回率恒为 0
+- 城市筛选查询需确保标注的 relevant_urls 对应岗位确实属于该城市
+- 查询分解（>=3 技能）在评估中会自动触发，需在 eval_queries 中明确标注多技能查询
+- ruff per-file-ignores 用于处理 sys.path.insert 导致的 E402（tests 需要后端路径）
+
+---

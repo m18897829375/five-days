@@ -1,0 +1,12 @@
+# Ralph Progress Log
+Started: 2026-05-07 20:30
+
+## Codebase Patterns
+- 使用 httpx 调用 OpenAI 兼容 API（非 openai SDK），模式参考 code_harness/llm_client.py
+- ruff 要求使用 contextlib.suppress 替代 try-except-pass (SIM105)
+- 项目 git 根目录在 agent/，非 ralph/ 子目录
+- 后端使用 asyncpg + SQLAlchemy async，所有 DB 操作需 await
+- CONTENT_API_KEY 和 CONTENT_BASE_URL 在 config.py 已定义但从未使用
+- chat_service.search_jobs() 内已有 URL 去重逻辑（_get_recommended_urls_from_messages）
+- 前端不在本 Ralph 任务的修改范围内
+---

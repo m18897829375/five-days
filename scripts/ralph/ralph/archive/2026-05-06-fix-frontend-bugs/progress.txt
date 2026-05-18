@@ -1,0 +1,11 @@
+# Ralph Progress Log
+Started: 2026年05月 6日
+
+## Codebase Patterns
+- 对话列表 JSX 使用 `conversation-item-wrapper` / `conversation-item-btn` / `conversation-delete-btn` 三个 class，但 CSS 未定义
+- `_fetch_jobs_from_db` 和 `retrieve_jobs` 各有一份独立的关键词匹配逻辑，修改时需保持两者一致
+- `_keyword_score` 只匹配 description + skills_json，不包含 title 字段
+- `search_jobs` 的 `_search_with_retry_mcp` 和 `_search_with_retry_scraper` 已实现但从未在 `search_jobs` 中被调用
+- ruff check 是唯一的后端 lint 工具，路径必须从 git root 使用完整路径运行
+
+---

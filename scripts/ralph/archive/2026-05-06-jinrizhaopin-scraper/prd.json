@@ -1,0 +1,131 @@
+{
+  "project": "JobMatchingBot",
+  "branchName": "ralph/adapt-search-bot-new-database",
+  "description": "找工作机器人适配新数据库 — 搜索链路改用is_active+city_normalized新字段，移除MCP步骤，CDP浏览器检测BOSS直聘\"职位已关闭\"，推荐兜底回退",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "移除 search_jobs 中的 MCP 搜索步骤",
+      "description": "As a developer, I want to remove the MCP search step from search_jobs() because BOSS data collection is now fully handled by boss-agent-cli-master CDP browser scripts.",
+      "acceptanceCriteria": [
+        "search_jobs() 中删除 _search_with_retry_mcp() 调用（chat_service.py lines 410-416）",
+        "搜索链路从 5 步简化为 4 步：BOSS搜索引擎爬虫 → 今日招聘爬虫 → RAG检索 → DB直查",
+        "_search_with_retry_mcp() 函数保留不删（可能将来恢复），仅移除调用",
+        "ruff check 通过"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "修复 _fetch_jobs_from_db 使用 is_active + city_normalized",
+      "description": "As a user searching for jobs, I want the database fallback query to use is_active and city_normalized so only truly active jobs in my selected cities are returned.",
+      "acceptanceCriteria": [
+        "_fetch_jobs_from_db() 查询条件 status == 'active' 改为 is_active == True",
+        "_fetch_jobs_from_db() 查询条件 city.in_(cities) 改为 city_normalized.in_(normalized_cities)",
+        "传入的 cities 先经 normalize_city() 标准化后再查询",
+        "ruff check 通过"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "修复 retrieve_jobs (RAG) 使用 is_active + city_normalized",
+      "description": "As a user, I want RAG retrieval to use the new active flag and city normalization so vector search results are accurate.",
+      "acceptanceCriteria": [
+        "retrieve_jobs() 查询条件 status == 'active' 改为 is_active == True",
+        "retrieve_jobs() 查询条件 city.in_(cities) 改为 city_normalized.in_(normalized_cities)",
+        "ruff check 通过"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "修复 clean_expired_recommendations 同时检查 is_active",
+      "description": "As a developer, I want expired recommendation cleanup to also catch jobs deactivated via is_active=False, not just status='expired'.",
+      "acceptanceCriteria": [
+        "clean_expired_recommendations() 增加 OR JobPosting.is_active == False 条件",
+        "is_active=False 的岗位 URL 被正确清理出推荐池",
+        "ruff check 通过"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "修复 job_monitor 使用 is_active + city_normalized",
+      "description": "As a system admin, I want the scheduled job validity checker to use new fields and skip BOSS直聘 HTTP checks (handled by CDP separately).",
+      "acceptanceCriteria": [
+        "run_job_validity_check() 改用 is_active == True 查询活跃岗位",
+        "BOSS 直聘岗位 (source='BOSS直聘') 跳过 HTTP 检查（不会误判为过期）",
+        "非 BOSS 来源继续 HTTP 状态码检查",
+        "失效时同时设置 is_active=False 和 status='expired'",
+        "get_fresh_jobs_count() 改用 is_active == True + city_normalized.in_(...)",
+        "ruff check 通过"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "CDP 浏览器检测 BOSS 直聘\"职位已关闭\"",
+      "description": "As a system admin, I want a script that opens stored BOSS job URLs in a real Chrome browser via CDP and detects the \"职位已关闭\" indicator so I can mark expired jobs.",
+      "acceptanceCriteria": [
+        "新建 backend/scripts/check_boss_urls.py",
+        "通过 CDP (patchright) 连接用户 Chrome (http://localhost:9222)",
+        "读取 source='BOSS直聘' 且 is_active=True 的岗位 URL",
+        "逐个打开 URL，等待 2-3s 页面渲染",
+        "检测页面文本中是否包含 '职位已关闭'",
+        "已关闭岗位设置 is_active=False + status='expired'",
+        "正常岗位保持 is_active=True",
+        "间隔 3-5s 随机延迟避免风控",
+        "支持 --limit N 参数限制检查数量",
+        "支持 --dry-run 参数（只检测不写入）",
+        "ruff check 通过"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "推荐后过滤与兜底回退",
+      "description": "As a user, I want recommendations to strictly match my city and salary, but fall back gracefully when not enough high-salary jobs are available.",
+      "acceptanceCriteria": [
+        "新增 _apply_recommendation_filters(jobs, user_cities, min_salary_threshold) 函数",
+        "过滤 city_normalized not in user_cities_normalized 的岗位",
+        "过滤 salary_min < min_salary_threshold 的岗位",
+        "严格匹配 ≥ 10 条时：取薪资降序前 10 条",
+        "严格匹配 < 10 条时：保留城市匹配，忽略薪资过滤，取最新 10 条 + 兜底提示",
+        "城市匹配总数 < 10 时：返回全部 + '当前城市在招岗位较少'提示",
+        "最终响应每个 job 包含 title/url/salary_min/salary_max/city/source",
+        "search_jobs() 在 post-processing 阶段调用此函数",
+        "ruff check 通过"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "配置修正：关闭 MCP + scheduler 使用正确间隔",
+      "description": "As a developer, I want the app config to reflect the no-MCP architecture and the scheduler to use the correct config value.",
+      "acceptanceCriteria": [
+        "config.py: BOSS_MCP_ENABLED 默认值改为 False",
+        "main.py lifespan: MCP 启动代码由 BOSS_MCP_ENABLED=False 控制跳过",
+        "main.py:18: scheduler interval 改用 JOB_ACTIVE_CHECK_INTERVAL_HOURS * 60",
+        "ruff check 通过"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+# Ralph Progress Log
+Started: 2026-05-06
+---
+
+## Codebase Patterns
+- SQLAlchemy async queries via `async_session()` context manager
+- JobPosting uses `is_active` (Boolean, indexed) + `status` (String) for dual lifecycle tracking
+- City normalization: `normalize_city()` in `backend/app/utils/city_utils.py`, maps districts to core cities
+- Search chain in `chat_service.py`: scrapers → RAG → DB (MCP step removed)
+- BOSS直聘 closed jobs return HTTP 200 with "职位已关闭" text — must detect via CDP browser, not HTTP
+- `job_monitor.py` skips BOSS直聘 HTTP checks; BOSS validity verified by `check_boss_urls.py` via CDP
+- Never modify `boss-agent-cli-master/` or `JrzpSpider-master/` subprojects
+- ruff is the linter: `cd backend && ruff check .`
+---
