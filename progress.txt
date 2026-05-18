@@ -1,20 +1,27 @@
 # Ralph Progress Log
-Started: Fri May 15 11:27:36     2026
-## 2026-05-15T12:00:00Z - US-001: Middleware Referer bypass — enable browser back button
-- What was implemented: Added Referer header check to middleware.ts progress-redirect block (lines 52-60). Same-origin Referer → NextResponse.next() allows browser back/F5 through. Missing/external Referer → existing redirect to targetRoute prevents step-skipping.
-- Files changed: middleware.ts (+5 lines)
-- **Learnings for future iterations:**
-  - `request.nextUrl.origin` is already computed on line 14 — reuse it for Referer origin comparison
-  - The isCompleted check fires before the Referer check, ensuring completed users always go to /results regardless of Referer
-  - Session creation block (lines 16-37) runs before progress check — curl tests without sessionId cookie will see a 307 from session creation, not from Referer logic
-  - Browser back button sends Referer header with the previous page URL (same-origin), F5 refresh preserves Referer (same-origin), manual URL entry in new tab has no Referer
----
-## 2026-05-15T12:50:00Z - US-002: Steps modification clears stale HealthResult
-- What was implemented: Added `await prisma.healthResult.deleteMany({ where: { userId: user.id } })` after `prisma.quizStep.upsert()` in app/api/quiz/step/route.ts (line 119). When any quiz step is created or modified, any existing HealthResult for that user is deleted. This ensures re-completing the quiz after modifying a step no longer returns 409 ALREADY_COMPLETED.
-- Files changed: app/api/quiz/step/route.ts (+2 lines)
-- **Learnings for future iterations:**
-  - `deleteMany` is the safe choice (not `delete`) — it never throws when no records match, handling the first-time flow gracefully (0 rows affected)
-  - The upsert+deleteMany within the same async function runs in sequence, not in a transaction — this is acceptable because the operation is idempotent
-  - The QuizStep data is preserved (only HealthResult is deleted), so step prefill still works after modification
+Started: Mon May 18 20:51:45     2026
 ---
 
+## 2026-05-18 21:00 - US-001
+- Code audit for Vercel-specific hardcoded references completed
+- Added `//vercel` comment key to package.json marking vercel:deploy as Vercel backup
+- Verified zero matches for @vercel, VERCEL_URL/VERCEL_ENV/VERCEL_REGION, and vercel.json in all source files
+- postinstall is exactly `prisma generate` — no Vercel-specific logic
+- Typecheck (npx tsc --noEmit) passes with zero errors
+- No functional code changes — Vercel config files preserved as-is
+- **Learnings for future iterations:**
+  - The `//` convention in package.json scripts is a widely-accepted way to add comments in JSON
+  - US-002 through US-005 will handle the actual migration work
+
+## 2026-05-18 22:15 - US-002
+- Verification-only pass — all 5 ACs met without code changes
+- npm install → postinstall triggers prisma generate → Prisma Client v7.8.0 generated successfully
+- node_modules/@prisma/client/index.js exists with valid generated code
+- npx tsc --noEmit typecheck passes with zero errors
+- npm run build (next build) completes with exit code 0, zero errors
+- .next directory has BUILD_ID, server/, static/ — all expected artifacts present
+- package.json postinstall is exactly "prisma generate" — no Vercel-specific logic
+- **Learnings for future iterations:**
+  - The postinstall script was already clean from US-001 — no changes needed
+  - Next.js 16.2.6 with Turbopack builds successfully on this codebase
+  - The warning about multiple lockfiles (C:\Users\ASUS\package-lock.json) is benign but could be silenced with turbopack.root config
