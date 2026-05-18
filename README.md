@@ -141,7 +141,7 @@ curl -s -b cookie.txt $BASE/api/results | jq .
 
 ```bash
 # 生成 PREMIUM 测试会话（含完整测评数据）
-curl -s https://health-assessment-bay.vercel.app/api/test/premium-session | jq .
+curl -s $BASE/api/test/premium-session | jq .
 ```
 
 返回示例：
@@ -157,7 +157,7 @@ curl -s https://health-assessment-bay.vercel.app/api/test/premium-session | jq .
 
 ```bash
 # 直接使用预付费测试会话查看完整 PREMIUM 报告
-curl -s -H 'Cookie: sessionId=e83bb9d8-825f-4317-b204-855dcac495ba' https://health-assessment-bay.vercel.app/api/results | jq .
+curl -s -H 'Cookie: sessionId=e83bb9d8-825f-4317-b204-855dcac495ba' $BASE/api/results | jq .
 ```
 
 此 sessionId 返回完整数据：体重预测趋势（weeklyProjection）+ 蛋白质/碳水/脂肪营养方案（planDetails）+ 运动计划 + 每日建议。
