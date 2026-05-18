@@ -1,0 +1,19 @@
+# Ralph Progress Log
+Started: Thu May  7 18:40:08     2026
+
+## Codebase Patterns
+- ruff UP045 要求用 `X | None` 替代 `Optional[X]`
+- DeepSeek API 调用模式：httpx.AsyncClient + 指数退避重试
+- settings 从 `app.core.config` 导入（`from app.core.config import settings`）
+- 新建服务模块放在 `backend/app/services/` 目录下
+---
+## 2026-05-07 19:00 - US-001
+- 新建 backend/app/services/skill_extractor.py
+- 实现 extract_skills() LLM 提取 + extract_skills_keyword_fallback() 关键词回退
+- Files changed: backend/app/services/skill_extractor.py (new)
+- **Learnings for future iterations:**
+  - ruff UP045 要求用 `X | None` 替代 `Optional[X]`
+  - DeepSeek API 调用模式参考 code_harness/llm_client.py：httpx.AsyncClient + 指数退避
+  - settings 从 app.core.config 导入，字段名如 CONTENT_API_KEY、CONTENT_BASE_URL
+  - 服务模块放在 backend/app/services/ 目录下
+---

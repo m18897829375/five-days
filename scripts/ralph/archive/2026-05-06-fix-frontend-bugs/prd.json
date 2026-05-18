@@ -1,0 +1,40 @@
+{
+  "project": "JobMatchingBot",
+  "branchName": "ralph/fix-conversation-style-and-search",
+  "description": "修复对话按钮CSS样式和搜索技能关键词匹配排序",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "修复对话按钮 CSS 样式（保留删除功能）",
+      "description": "As a user, I want conversation list buttons to have the original purple theme styling (hover highlight, active state, text overflow ellipsis) while keeping the delete button for each conversation.",
+      "acceptanceCriteria": [
+        "删除 App.css 中旧的 .conversation-item / .conversation-item:hover / .conversation-item.active 规则（约第156-180行）",
+        "新增 .conversation-item-wrapper CSS：display:flex, align-items:center, border-radius:6px, hover背景 rgba(139,92,246,0.1), active背景 rgba(139,92,246,0.15)",
+        "新增 .conversation-item-btn CSS：flex:1, min-width:0, text-align:left, text-overflow:ellipsis, padding:10px 12px, border-radius:6px, font-size:14px, white-space:nowrap, overflow:hidden",
+        "新增 .conversation-delete-btn CSS：默认 display:none, wrapper hover时 display:flex, 独立hover变红色(error), disabled时opacity:0.4",
+        ".conversation-item-wrapper:hover .conversation-item-btn 和 .conversation-item-wrapper.active .conversation-item-btn 颜色为 var(--text-primary)",
+        "tsc --noEmit 通过"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "修复搜索技能关键词匹配与排序",
+      "description": "As a user, I want different skill keywords (e.g. 'Python' vs 'Java') to produce meaningfully different job rankings, with better-matched jobs appearing first, sorted by match count then salary. Multiple queries in the same conversation should all return results.",
+      "acceptanceCriteria": [
+        "_fetch_jobs_from_db 排序从'仅按 salary_max'改为'按技能匹配数 desc → salary_max desc'（匹配越多越靠前）",
+        "_keyword_score 加入 title 字段匹配（原来只搜 description + skills_json），标题命中权重 ×2",
+        "薪资阈值 MIN_SALARY_THRESHOLD = 10000 保持不变",
+        "所有平台（BOSS直聘、今日招聘等）岗位统一混合输出，不区分 source",
+        "搜索 'Python Django' 时，标题含这两个关键词的岗位排在前面",
+        "搜索 'Java Spring' 时，与 'Python Django' 的结果排序有明显差异",
+        "ruff check 通过"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

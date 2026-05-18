@@ -1,0 +1,163 @@
+# Ralph Progress Log
+Started: 2026-05-02
+---
+
+## Codebase Patterns
+- Backend: FastAPI + SQLAlchemy async (asyncpg) + PostgreSQL + pgvector
+- Frontend: React 19 + TypeScript + TailwindCSS 4 + Vite
+- Database models in `backend/app/models/` using SQLAlchemy declarative base with BaseMixin (id, created_at, updated_at)
+- API routers in `backend/app/api/` with FastAPI APIRouter, prefix `/api/...`
+- Alembic migrations in `backend/alembic/versions/`
+- Frontend state: localStorage for conversations/messages persistence
+- Vite proxy forwards `/api` to backend port 8000
+- Backend lint: ruff with B008 ignored (FastAPI Depends pattern)
+- Frontend: TypeScript strict mode, `tsc --noEmit` for typecheck
+- Dark theme CSS custom properties in `src/index.css`
+- Ralph script at `scripts/ralph/ralph.sh` reads `prd.json` from same directory
+- Scraper pattern: Playwright Chromium with stealth scripts, TokenBucket rate limiter, RobotsChecker for robots.txt compliance, exponential backoff retry
+- `app/utils/` for shared utilities (rate_limiter, robots_checker)
+- Scrapers in `app/services/` with best-effort fallback to mock data in chat_service
+- mcp-bosszp vendor at `backend/vendor/mcp-bosszp/` — Boss直聘 official API via MCP
+- MCP subprocess managed by `BossMCPClient` with HTTP streamable-http transport (JSON-RPC 2.0)
+- Cookie persistence to `backend/vendor/mcp-bosszp/cookie.json` — auto-loaded on startup
+- Login state machine: UNKNOWN → LOGGING_IN → WAITING_FOR_SCAN → LOGGED_IN / EXPIRED
+
+---
+
+## 2026-05-02 - US-001: 克隆 mcp-bosszp 到 vendor 目录
+- mcp-bosszp 源码已克隆到 vendor/mcp-bosszp/
+- 依赖已安装 (fastmcp 3.2.4, playwright, pycryptodome)
+- playwright chromium 已安装
+- .gitignore 已配置 cookie.json 和 static/ 排除
+- vendor 目录加入 pyproject.toml ruff exclude 列表
+- 修复了 24 个 ruff lint 问题（16 个自动修复 + 8 个手动修复）
+**Learnings for future iterations:**
+  - ruff 配置需在 pyproject.toml 中添加 exclude = ["vendor"] 来排除第三方代码
+  - Windows 下 Bash 对路径处理与 PowerShell 不同，需注意路径一致性
+  - 项目使用 pyproject.toml 管理 ruff 配置，规则包含 E/F/I/N/W/UP/B/SIM
+---
+
+## 2026-05-02 - US-002: mcp-bosszp 添加 Cookie 持久化
+- 验证 BossZhipinState.save_cookie() 方法存在 (写入 cookie.json 含 cookie, bst, saved_at)
+- 验证 BossZhipinState.load_cookie() 方法存在 (从 cookie.json 读取恢复状态)
+- 验证 BossZhipinState.verify_cookie() 方法存在 (向 Boss API 验证有效性)
+- 验证 MCP server 启动时自动调用 load_cookie() + verify_cookie()
+- 验证失败时删除过期 cookie.json 并重置登录状态
+- 验证 login_full_auto 和 login_start_interactive 登录成功后调用 save_cookie()
+- 验证 MCP server 支持 --port 参数
+- Python 语法检查通过
+---
+
+## 2026-05-02 - US-003: 新建 BossMCPClient 子进程管理
+- 验证 start() 通过 subprocess.Popen 启动 boss_zhipin_fastmcp_v2.py --port <port>
+- 验证健康检查：轮询 /mcp 端点 30 秒，200 或 405 视为 ready
+- 验证失败抛出 RuntimeError 并记录子进程输出
+- 验证 stop() 先 terminate()，等待 10 秒，超时 kill()
+- 验证 stop() 后子进程无残留 (self._process = None)
+- 验证 _check_restart() 自动重启最多 3 次
+- 验证 Windows CREATE_NO_WINDOW flag
+- 验证 BOSS_MCP_ENABLED=False / enabled=False 跳过启动
+- ruff check passes
+---
+
+## 2026-05-02 - US-004: BossMCPClient Cookie 有效性验证
+- 验证 _check_saved_cookie() 通过调用 get_recommend_jobs_tool 向 Boss API 发起请求
+- 验证解析返回的 status、code、message 综合判断 Cookie 有效性
+- 验证 code == 0 且 status == success 时判定为已登录
+- 验证 message 含 '未登录'/'登录' 或 code 为 401/403/-1 时判定为过期
+- 验证 HTTP 401 错误直接判定为过期
+- 验证判定过期时自动删除 cookie.json
+- 验证 cookie.json 不存在时状态设为 UNKNOWN
+- ruff check passes（修复了 vendor 文件剩余 7 个 ruff 问题）
+---
+
+## 2026-05-03 - US-005: BossMCPClient 登录状态机
+- 自检确认所有状态机 AC 均已通过
+- LoginState 枚举: UNKNOWN/LOGGING_IN/WAITING_FOR_SCAN/LOGGED_IN/EXPIRED (line 23-28)
+- state 属性可读，初始 UNKNOWN (line 70, 266-268)
+- ensure_login() LOGGED_IN 直接返回，否则触发登录 (line 270-285)
+- _start_login() 调用 login_full_auto → WAITING_FOR_SCAN (line 287-307)
+- _start_login() 透传 {status, raw} 不硬编码解析 (line 304)
+- check_login_status() 轮询 get_login_info_tool (line 309-324)
+- set_state()/set_qr_data() 测试用 (line 449-455)
+- ruff check passes
+---
+
+## 2026-05-03 - US-006: BossMCPClient HTTP MCP 调用
+- 自检确认所有 AC 均已通过
+- _mcp_call() 发送 JSON-RPC 2.0 到 http://127.0.0.1:<port>/mcp (line 235-253)
+- 请求格式: {jsonrpc: 2.0, method: tools/call, params: {name, arguments}, id: N} (line 245-250)
+- 共享 httpx.AsyncClient, timeout 30s (line 230-233)
+- _extract_content() 从 FastMCP 返回格式中提取 text (line 256-262)
+- 全局单例 boss_mcp_client 可被其他模块 import (line 459)
+- ruff check passes
+---
+
+## 2026-05-03 - US-007: BossMCPClient search_jobs 含登录过期检测
+- 自检确认所有 AC 均已通过
+- search_jobs() 非 LOGGED_IN 直接返回空列表 (line 340-342)
+- 调用 get_recommend_jobs_tool 获取职位列表 (line 344)
+- 解析 data.jobList[] 转换为 MCPJobInfo 对象列表 (line 372-386)
+- _is_login_expired(): code 401/403/-1/-100 或 message 含 未登录/登录过期/重新登录/token/expired (line 406-410)
+- 检测到过期时设 EXPIRED，删除 cookie.json，调用 _relogin_and_search() (line 361-366)
+- _relogin_and_search(): logged_in→重试搜索, waiting_for_scan→返回空 (line 412-423)
+- HTTP 401/403 触发过期检测+自动重新登录 (line 390-397)
+- 其他异常记录日志+返回空列表+尝试子进程重启 (line 400-403)
+- ruff check passes
+---
+
+## 2026-05-03 - US-008: 新增 MCP 配置项
+- 自检确认所有 AC 均已通过
+- Settings 新增 BOSS_MCP_ENABLED: bool = True (config.py:41)
+- Settings 新增 BOSS_MCP_PORT: int = 8100 (config.py:42)
+- 支持通过 .env 文件覆盖默认值 (config.py:44: model_config env_file=".env")
+- BOSS_MCP_ENABLED=False 时整个 MCP 集成不加载 (main.py:21 启动守卫, main.py:34 关闭守卫, boss_mcp_client.py:81 enabled=False 守卫)
+- ruff check passes
+---
+
+## 2026-05-03 - US-009: 修改 chat_service.py 新增 MCP 优先搜索
+- 自检确认所有 AC 均已通过
+- search_jobs() 函数新增 Step 0: MCP 客户端搜索 (chat_service.py:298-334)
+- 仅当 boss_mcp_client.state == LOGGED_IN 时才调用 MCP (line 302)
+- MCP 搜索超时设为 30 秒 (line 310: timeout=MCP_TIMEOUT, MCP_TIMEOUT=30)
+- 将 MCP 返回的职位转换为 JobItem（title、url、salary_min/max、city、source='BOSS直聘'）(line 316-323)
+- URL 格式: https://www.zhipin.com/job_detail/{job_id}.html (line 314)
+- 薪资从 salaryDesc（如 15-25K）解析为数值 (line 315: _parse_salary)
+- MCP 职位保存到 JobPosting 数据库表 (line 325: _save_mcp_job_to_db)
+- 根据 skills 自动推断 experience 参数映射 (line 306: _map_experience)
+- 根据 skills 自动推断 salary 参数映射 (line 308: _map_salary)
+- MCP 不足 10 条时继续走原有 fallback 链路 (line 337: if len(collected) < target_limit)
+- 新增 _parse_salary()、_map_experience()、_map_salary()、_save_mcp_job_to_db() 辅助函数 (line 27-108)
+- 原有搜索引擎爬虫、RAG、DB 查询逻辑保持不变 (line 336-391)
+- ruff check passes
+---
+
+## 2026-05-03 - US-010: 集成到 main.py lifespan
+- 自检确认所有 AC 均已通过
+- lifespan startup 中调用 boss_mcp_client.start() (main.py:26)
+- 启动失败时记录 warning 日志但不阻塞应用启动 (main.py:28-29: except Exception → logger.warning, 不 re-raise)
+- 设置 boss_mcp_client.port 和 base_url 为配置文件中的值 (main.py:24-25: settings.BOSS_MCP_PORT)
+- lifespan shutdown 中调用 boss_mcp_client.stop() (main.py:37)
+- shutdown 异常时捕获日志不中断关闭流程 (main.py:38-39: except Exception: pass)
+- ruff check passes
+---
+
+## 2026-05-03 - US-011: 新建 boss_login_router.py 登录状态 API
+- 自检确认所有 AC 均已通过
+- GET /api/boss/login/status 返回 {status: 'unknown'|'logging_in'|'waiting_for_scan'|'logged_in'|'expired'} (boss_login_router.py:15-19: return {"status": boss_mcp_client.state.value})
+- POST /api/boss/login/start 触发扫码登录，返回 {status, raw: <完整MCP响应>} (boss_login_router.py:22-26: return await boss_mcp_client.ensure_login(), ensure_login 内部返回透传 raw)
+- GET /api/boss/login/check 轮询登录状态，已登录返回 {status: 'logged_in'} (boss_login_router.py:29-33: return await boss_mcp_client.check_login_status())
+- 路由注册到 FastAPI app（前缀 /api/boss）(boss_login_router.py:12: prefix="/api/boss" + main.py:57: app.include_router(boss_login_router))
+- ruff check passes
+---
+
+## 2026-05-03 - US-012: 降级策略验证
+- 自检确认所有 AC 均已通过
+- BOSS_MCP_ENABLED=False 时，search_jobs 直接从搜索引擎爬虫开始 (boss_mcp_client.py:81-84: enabled=False → state=EXPIRED + chat_service.py:302: LOGGED_IN 守卫 → MCP 步骤被跳过 + chat_service.py:337: 直接进入 Step 1 scraper)
+- MCP 子进程启动失败时，search_jobs 降级到搜索引擎爬虫 (boss_mcp_client.py:89/124: 启动失败 → state=EXPIRED，同上降级链路)
+- MCP 搜索返回空结果时，继续走搜索引擎 -> RAG -> DB 链路 (chat_service.py:337/356/373/386: 四处 len(collected) < target_limit 守卫)
+- 原有 boss_scraper.py、today_job_scraper.py、retriever.py 代码不被修改 (git diff --name-only 无匹配结果)
+- 降级后 API 响应格式保持一致（JobItem[]）(chat_service.py:405: return ChatResponse(jobs=collected, ...), collected: list[JobItem])
+- ruff check passes (python -m ruff check backend/app/services/chat_service.py — All checks passed!)
+- tsc --noEmit passes (npx tsc --noEmit — 无错误输出)
+---

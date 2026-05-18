@@ -1,0 +1,13 @@
+# Ralph Progress Log
+Started: 2026-05-06 17:00:00
+---
+
+## Codebase Patterns
+- Backend: FastAPI + SQLAlchemy async (asyncpg) + PostgreSQL + pgvector
+- Ruff for linting: `cd backend && ruff check .`
+- Frontend: Vite + React + TypeScript + Tailwind CSS v4
+- tsc for typecheck: `cd frontend && npx tsc --noEmit`
+- chat_service.py `search_jobs()` is the main job search orchestrator
+- App.tsx is the sole frontend component (no sub-components for sidebar, input, chat)
+
+---

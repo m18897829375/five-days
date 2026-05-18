@@ -1,0 +1,245 @@
+{
+  "project": "JobMatchingBot",
+  "branchName": "job-matching-bot",
+  "description": "找工作机器人 - AI 驱动的求职匹配平台，从 BOSS直聘 和 今日招聘 搜索岗位，按薪资降序返回匹配的 URL",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "用户输入技能搜索岗位",
+      "description": "As a 求职者, I want 在对话框输入我的主要技能 so that 系统能搜索匹配的岗位。",
+      "acceptanceCriteria": [
+        "用户可在输入框输入文本（如 Python Django REST API）",
+        "点击发送后，系统显示搜索中加载状态",
+        "搜索结果以链接列表形式展示，每条包含岗位标题（可点击跳转）、薪资范围、城市、来源站点",
+        "结果按薪资降序排列（salary_max 高的排在前面）",
+        "最多返回 10 条结果",
+        "搜索无结果时显示未找到匹配岗位提示",
+        "Typecheck/lint passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "用户上传简历自动提取技能",
+      "description": "As a 求职者, I want 上传我的 PDF/DOCX/TXT 简历 so that 系统自动提取技能并搜索岗位。",
+      "acceptanceCriteria": [
+        "支持 PDF、DOCX、TXT 三种格式上传",
+        "文件大小限制 10MB",
+        "上传后自动解析简历文本，提取技能关键词",
+        "解析出的技能显示给用户确认（可选编辑）",
+        "确认后自动触发岗位搜索",
+        "上传/解析过程显示进度指示",
+        "Typecheck/lint passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "不重复推荐岗位",
+      "description": "As a 求职者, I want 已推荐过的岗位不再出现 so that 我能看到新的机会。",
+      "acceptanceCriteria": [
+        "系统记录每个用户已推荐的 URL（存储在 recommended_urls 表）",
+        "每次搜索排除已推荐的 URL",
+        "同一 URL 不会被推荐第二次",
+        "Typecheck/lint passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "新建对话",
+      "description": "As a 求职者, I want 新建一个对话 so that 我能开始新的求职搜索。",
+      "acceptanceCriteria": [
+        "侧边栏有新建对话按钮",
+        "点击后清空主区域，创建新的 conversation_id",
+        "新对话在对话列表中置顶（最新在最上方）",
+        "Typecheck/lint passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "对话历史记录与排序",
+      "description": "As a 求职者, I want 查看之前的对话记录 so that 我能回顾之前的搜索结果。",
+      "acceptanceCriteria": [
+        "左侧边栏显示所有对话列表",
+        "对话按首次发起时间正序排序（最早的在最下方，最新的在最上方）",
+        "点击对话可加载该对话的完整历史记录",
+        "每条对话显示标题（首条用户消息的前 30 个字符）",
+        "Typecheck/lint passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "岗位时效性监控",
+      "description": "As a 系统, I want 定期检查岗位链接是否有效 so that 能及时替换过期岗位。",
+      "acceptanceCriteria": [
+        "每 30 分钟自动检查已入库岗位的 URL 是否可访问",
+        "通过 Playwright 访问 URL 检查 HTTP 状态码",
+        "标记状态为 404/过期的岗位",
+        "过期岗位从推荐池中移除",
+        "用户下次搜索时自动补充新岗位",
+        "Typecheck/lint passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Uses httpx for URL checks; switch to Playwright when US-011 scraper is ready"
+    },
+    {
+      "id": "US-007",
+      "title": "指定意向城市搜索",
+      "description": "As a 求职者, I want 指定意向城市 so that 搜索结果限定在目标城市范围内。",
+      "acceptanceCriteria": [
+        "用户可通过下拉菜单选择城市（支持多选）",
+        "默认全选 20 个城市",
+        "搜索结果仅包含选定城市的岗位",
+        "Typecheck/lint passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "前端 UI（类 Claude Code 风格）",
+      "description": "As a 用户, I want 一个类似 Claude Code 的简洁界面 so that 使用体验流畅专业。",
+      "acceptanceCriteria": [
+        "左侧边栏：对话列表 + 新建对话按钮 + 城市选择",
+        "主区域：顶部问候语 + 消息历史 + 底部输入框",
+        "输入框支持文本输入和文件上传（拖拽 + 点击）",
+        "搜索结果显示为简洁的链接列表",
+        "响应式设计，支持桌面和移动端",
+        "暗色/亮色主题",
+        "Typecheck/lint passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Added light/dark theme toggle, improved greeting, fixed resume upload visibility, polished sidebar layout"
+    },
+    {
+      "id": "US-009",
+      "title": "Code Harness 构建管道",
+      "description": "As a 开发者, I want 通过 Harness 自动生成和验证代码 so that 代码质量有保证。",
+      "acceptanceCriteria": [
+        "Planner 使用 deepseek-v4-pro，thinking mode high（16K budget）",
+        "Generator 使用 qwen3.6-plus，thinking mode max（32K budget）",
+        "Evaluator 使用 deepseek-v4-pro，thinking mode max（32K budget）",
+        "结构化交接：Planner→Generator（contract.json），Generator↔Evaluator（diff/review 循环），Evaluator→Planner（PASSED.json）",
+        "评分≥70% 通过（6 维度：security、error_handling、boundary_conditions、api_stability、test_coverage、code_style）",
+        "Generator 失败 3 次后拆分任务",
+        "上下文管理：Planner 90% compact、Generator 256K compact、Evaluator rollback-to-contract",
+        "Typecheck/lint passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "code_harness/ package: planner (deepseek-v4-pro), generator (qwen3.6-plus), evaluator (deepseek-v4-pro) with structured handoff via contract.json/diff/PASSED.json, 6-dimension scoring, max 3 generator failures triggers task split, context management with compaction thresholds"
+    },
+    {
+      "id": "US-010",
+      "title": "启动前 API Key 验证",
+      "description": "As a 用户, I want 在 Harness 运行前验证所有 API Key so that 避免运行时因 Key 无效而失败。",
+      "acceptanceCriteria": [
+        "启动时检查 .env 中的 CODE_PLANNER_API_KEY、CODE_GENERATOR_API_KEY、CODE_EVALUATOR_API_KEY 等",
+        "对每个 Key 调用对应 LLM 端点验证连通性",
+        "验证失败时显示具体哪个 Key 无效",
+        "所有 Key 验证通过后才允许继续",
+        "Typecheck/lint passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "api_check.py validates all 3 keys from .env, reports per-key MISSING/INVALID status, CLI blocks run on failure"
+    },
+    {
+      "id": "US-011",
+      "title": "BOSS直聘数据抓取",
+      "description": "As a 系统, I want 通过 Playwright 从 BOSS直聘 抓取岗位数据 so that 获取实时岗位信息。",
+      "acceptanceCriteria": [
+        "使用 Playwright Chromium 无头浏览器模拟真实用户",
+        "遵守 robots.txt（通过 RobotsChecker）",
+        "频率控制：QPS ≤ 1.0，Token Bucket 限流",
+        "指数退避重试（最多 3 次）",
+        "解析岗位标题、URL、薪资范围、城市、描述、技能要求",
+        "反爬虫规避：user-agent、viewport、webdriver 属性屏蔽",
+        "Typecheck/lint passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Playwright Chromium scraper with stealth mode, robots.txt compliance, token-bucket rate limiting (QPS 1.0), exponential backoff retry"
+    },
+    {
+      "id": "US-012",
+      "title": "今日招聘数据抓取",
+      "description": "As a 系统, I want 通过 Playwright 从 今日招聘 抓取岗位数据 so that 覆盖更多岗位来源。",
+      "acceptanceCriteria": [
+        "使用 Playwright Chromium 无头浏览器",
+        "遵守 robots.txt",
+        "频率控制：QPS ≤ 1.0",
+        "指数退避重试（最多 3 次）",
+        "解析岗位信息（同 US-011）",
+        "Typecheck/lint passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Playwright Chromium scraper for todayjob.cn, mirrors BOSS直聘 pattern: stealth, robots.txt, token-bucket, exponential backoff, DB persistence"
+    },
+    {
+      "id": "US-013",
+      "title": "RAG 向量检索",
+      "description": "As a 系统, I want 使用 pgvector 进行向量检索 so that 技能匹配更精准。",
+      "acceptanceCriteria": [
+        "岗位文本通过 Embed Server 生成 1024 维向量",
+        "用户技能文本也生成向量",
+        "混合检索：向量相似度 + 关键词匹配",
+        "城市过滤、已推荐 URL 排除",
+        "按薪资降序排序，返回 Top 10",
+        "Typecheck/lint passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "rag/embedder.py with Embed Server + keyword fallback, rag/retriever.py with pgvector cosine similarity + keyword matching, integrated into chat_service"
+    },
+    {
+      "id": "US-014",
+      "title": "Docker 容器化部署",
+      "description": "As a 开发者, I want 通过 Docker Compose 一键启动所有服务 so that 部署简单可靠。",
+      "acceptanceCriteria": [
+        "docker-compose.yml 包含：PostgreSQL + pgvector、Redis、MinIO、Embed Server、Backend API、Frontend",
+        "各服务有独立的 Dockerfile",
+        "一键启动：docker compose up -d",
+        "健康检查：所有服务就绪后可用",
+        "Typecheck/lint passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": "docker-compose.yml with PostgreSQL+pgvector, Redis, MinIO, Backend, Frontend; health checks; .env.example template"
+    },
+    {
+      "id": "US-015",
+      "title": "岗位入库与数据管理",
+      "description": "As a 系统, I want 将抓取的岗位数据存储到数据库 so that 支持快速检索和去重。",
+      "acceptanceCriteria": [
+        "JobPosting 表存储岗位信息（source, source_id, url, title, salary_min, salary_max, city, description, skills_json, fetched_at, expires_at, status）",
+        "JobEmbedding 表存储 pgvector 向量（1024 维）",
+        "Source-SourceID 联合唯一约束（防重复入库）",
+        "自动提取岗位描述中的技能关键词",
+        "入库时自动去重",
+        "Typecheck/lint passes"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": "rag/ingestor.py — skill extraction, ON CONFLICT dedup, auto-embeddings"
+    }
+  ]
+}

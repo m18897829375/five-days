@@ -1,0 +1,274 @@
+# Ralph Progress Log
+Started: 2026年04月30日 15:52:39
+---
+
+## Codebase Patterns
+- Backend: FastAPI + SQLAlchemy async (asyncpg) + PostgreSQL + pgvector
+- Frontend: React 19 + TypeScript + TailwindCSS 4 + Vite
+- Database models in `backend/app/models/` using SQLAlchemy declarative base with BaseMixin (id, created_at, updated_at)
+- API routers in `backend/app/api/` with FastAPI APIRouter, prefix `/api/...`
+- Alembic migrations in `backend/alembic/versions/`
+- Frontend state: localStorage for conversations/messages persistence
+- Vite proxy forwards `/api` to backend port 8000
+- Backend lint: ruff with B008 ignored (FastAPI Depends pattern)
+- Frontend: TypeScript strict mode, `tsc --noEmit` for typecheck
+- Dark theme CSS custom properties in `src/index.css`
+- Ralph script at `scripts/ralph/ralph.sh` reads `prd.json` from same directory
+- Scraper pattern: Playwright Chromium with stealth scripts, TokenBucket rate limiter, RobotsChecker for robots.txt compliance, exponential backoff retry
+- `app/utils/` for shared utilities (rate_limiter, robots_checker)
+- Scrapers in `app/services/` with best-effort fallback to mock data in chat_service
+
+## [2026-04-30 16:00] - US-001
+- Implemented user skill search with full-stack scaffold from scratch
+- Files created:
+  - backend/: FastAPI app with chat API, SQLAlchemy models, Alembic migrations
+  - frontend/: React + Vite + TailwindCSS chat UI (Claude Code-like dark theme)
+  - Scripts: prd.json for Ralph agent configuration
+- Features: text input, loading spinner, job result cards (title+salary+city+source), salary descending sort, max 10 results, no-results message, city filter dropdown (20 cities), new conversation, conversation list
+- Typecheck passes: `tsc --noEmit` (frontend), `ruff check app/` (backend)
+- Frontend build: 241KB JS (79KB gzipped), under 2MB target
+- **Learnings for future iterations:**
+  - pip editable install needs `[tool.setuptools.packages.find]` in pyproject.toml to avoid "multiple top-level packages" error
+  - `Depends()` in FastAPI function defaults triggers ruff B008 — ignore it, it's standard FastAPI pattern
+  - Windows git CRLF: .gitignore needed to exclude node_modules, dist, __pycache__, *.egg-info
+
+## [2026-04-30 17:30] - US-002
+- Implemented resume upload with skill extraction and editing
+- Files changed:
+  - backend/app/services/resume_parser.py: PDF/DOCX/TXT parser with skill keyword extraction
+  - backend/app/api/resumes_router.py: POST /api/resumes/ endpoint with 10MB limit, format validation
+  - frontend/src/components/SkillEditor.tsx: New component for editing extracted skills
+  - frontend/src/components/ResumeUpload.tsx: Upload component with drag-and-drop, progress indicator
+  - frontend/src/App.tsx: Integrated skill editing flow (upload → extract → edit → confirm → search)
+  - frontend/src/App.css: Styles for skill editor, tags, add/remove, confirm button
+- Features: PDF/DOCX/TXT upload, 10MB size limit, auto skill extraction, editable skill tags (add/remove), confirm-and-search button, progress indicator during parsing
+- Frontend typecheck (tsc --noEmit) passes, vite build succeeds
+- **Learnings for future iterations:**
+  - backend uses pdfplumber for PDF, python-docx for DOCX parsing (not pdf-parse/mammoth)
+  - Skill extraction uses keyword matching against TECH_SKILLS list in resume_parser.py
+  - Frontend flow: upload → parse → show SkillEditor → user edits → confirm triggers handleSendMessageWithSkills
+
+## [2026-04-30 18:00] - US-003
+- Implemented duplicate recommendation prevention
+- Files changed:
+  - backend/app/models/recommended_url.py: Added UniqueConstraint on (conversation_id, url)
+  - backend/alembic/versions/002_add_recommended_url_unique_constraint.py: New migration
+  - backend/app/services/chat_service.py: Added get_recommended_urls, record_recommended_urls; search_jobs now filters out already-recommended URLs and records new ones
+- Features: system records recommended URLs per conversation, same URL excluded from future searches, unique constraint prevents duplicate database entries
+- Backend lint (ruff check) passes, frontend typecheck passes
+- **Learnings for future iterations:**
+  - recommended_urls table tracks URLs per conversation_id (not per user) — one user = one conversation
+  - search_jobs both reads and writes recommended_urls in the same transaction via the db session
+  - Alembic migration 001 already creates the recommended_urls table; migration 002 only adds the unique constraint
+
+## [2026-04-30 18:30] - US-004
+- Verified new conversation functionality was already implemented as part of US-001 scaffold
+- No code changes needed — all acceptance criteria met:
+  - New conversation button exists in sidebar header and welcome screen
+  - `handleNewConversation` calls `POST /api/chat/conversations`, clears messages, creates new conversation_id
+  - New conversation prepended to list via `persistConversations([newConv, ...conversations])`
+- Typecheck (tsc --noEmit) and lint (ruff check) pass
+- **Learnings for future iterations:**
+  - Frontend uses localStorage for conversation/message persistence — no backend list endpoint needed on page load
+  - `handleNewConversation` has fallback to `crypto.randomUUID()` when backend is unavailable
+
+## [2026-04-30 19:00] - US-005
+- Implemented conversation history loading from backend instead of localStorage
+- Files changed:
+  - backend/app/api/chat_router.py: Added `GET /{conversation_id}/messages` endpoint, included `created_at` in `ConversationListItem`
+  - frontend/src/types/index.ts: Added `created_at` to `Conversation` and `Message` interfaces
+  - frontend/src/App.tsx: Refactored to load conversations from `GET /api/chat/conversations` on mount, load messages from `GET /api/chat/{id}/messages` when selecting a conversation, reversed display order so newest conversation appears first
+- Features: conversation list fetched from backend on page load, messages loaded from DB when clicking a conversation, title shows first 30 chars of user message, conversations sorted by created_at ascending (backend) and reversed for display (latest on top)
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes, vite build succeeds (247KB JS)
+- **Learnings for future iterations:**
+  - Backend `list_conversations` returns `created_at.asc()` — frontend reverses the array to display latest first. Both sides must agree on sort direction.
+  - `setActiveAndLoad` combines setting active conversation ID, localStorage persistence, and message loading into one callback to avoid stale state
+  - `loadConversations` is called after each message send to keep the conversation title up to date in the sidebar
+---
+
+## [2026-04-30 20:00] - US-006
+- Implemented job validity monitoring with APScheduler background job
+- Files changed:
+  - backend/app/services/job_monitor.py: New service — `check_url_status`, `run_job_validity_check` (30-min interval), `get_expired_jobs_count`, `get_fresh_jobs_count`, `remove_expired_from_recommendations`
+  - backend/app/scheduler.py: New module — APScheduler `AsyncIOScheduler` integration with FastAPI lifespan
+  - backend/app/main.py: Added lifespan context manager, registered monitor router
+  - backend/app/api/monitor_router.py: New API — `GET /api/monitor/status`, `POST /api/monitor/check`
+  - backend/app/services/chat_service.py: Added `clean_expired_recommendations` — removes expired URLs from recommendation pool on each user search
+  - backend/app/models/job_posting.py: Added `http_status` and `last_checked_at` fields for monitoring observability
+  - backend/app/core/config.py: Added `JOB_MONITOR_INTERVAL_MINUTES` setting (default 30)
+  - backend/alembic/versions/003_add_job_monitoring_fields.py: Migration for new fields
+  - backend/app/api/__init__.py: Exported monitor_router
+- Features: automatic 30-min URL validity checks via APScheduler, expired jobs marked and removed from recommendation pool, manual trigger endpoint, monitoring status endpoint, auto-supplement on user search
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes, vite build succeeds (247KB JS)
+- **Learnings for future iterations:**
+  - APScheduler `AsyncIOScheduler` works with FastAPI lifespan — start on startup, shutdown on exit
+  - Scheduler jobs run outside request context, so must create own db sessions via `async_session()` directly (not `get_db`)
+  - `clean_expired_recommendations` uses `outerjoin` with JobPosting — URLs not in job_postings table (mock data) won't be cleaned
+  - httpx used for URL checks (lighter weight); switch to Playwright when scraper US-011 is implemented
+  - `http_status` and `last_checked_at` fields on JobPosting provide observability into monitoring history
+---
+
+## [2026-04-30 20:30] - US-007
+- Implemented city filtering for job search results
+- Files changed:
+  - backend/app/services/chat_service.py: Added city_set filter in search_jobs before dedup; mock jobs filtered by selected cities
+- Features: search results only include jobs in user-selected cities; frontend already had city selector sending cities param to backend
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes, vite build succeeds
+- **Learnings for future iterations:**
+  - `cities` parameter in search_jobs was already accepted but not used — now applied as a set membership filter
+  - Empty cities list or None means all cities (no filtering)
+  - When real scraper/RAG is built, city filter will need to be applied at the SQL query level for efficiency
+---
+
+## [2026-04-30 21:00] - US-008
+- Improved frontend UI to match Claude Code style
+- Files changed:
+  - frontend/src/index.css: Added light theme CSS variables via body.light-theme class
+  - frontend/src/App.tsx: Added theme toggle (Sun/Moon icons), getGreeting() for time-based greetings, showResumeUpload state for visible file upload, improved welcome/greeting messages
+  - frontend/src/App.css: Added theme toggle button styles, sidebar header layout (flex with gap)
+- Features: light/dark theme toggle persisted in localStorage, time-based greeting on welcome screen and chat area, resume upload button always visible in input area, cleaner sidebar header layout
+- Frontend typecheck (tsc --noEmit) passes, backend lint (ruff check) passes, vite build succeeds (249KB JS, 81KB gzipped)
+- **Learnings for future iterations:**
+  - Theme toggle uses body class + CSS custom properties — no need for per-component theme logic
+  - `getGreeting()` checks hour ranges for Chinese greetings (夜深了/早上好/中午好/下午好/晚上好)
+  - Resume upload was hidden with `display: none` — now toggled via showResumeUpload state for better UX
+  - Sidebar header uses flex layout with gap to position new-chat-btn and theme-toggle side by side
+---
+
+## [2026-04-30 21:30] - US-009
+- Implemented Code Harness build pipeline from scratch
+- Files created (code_harness/):
+  - contract.py: Contract/ContractMode/AcceptanceCriterion Pydantic models (build/bugfix/smoke)
+  - llm_client.py: OpenAI-compatible client with Qwen thinking mode + exponential backoff retry
+  - context_manager.py: AgentContext with token estimation (~3.5 chars/token), compact/clear per role
+  - handoff.py: RunDir managing runs/<id>/ with atomic writes of contract.json, diff_vN.patch, review_vN.json, PASSED/FAILED.json
+  - planner.py: deepseek-v4-pro integration, brief → Contract
+  - generator.py: qwen3.6-plus integration, Contract → unified diff
+  - evaluator.py: deepseek-v4-pro, 6-dimension scoring (security/error_handling/boundary_conditions/api_stability/test_coverage/code_style), >=70% pass
+  - orchestrator.py: Planner→Generator↔Evaluator loop, max 10 iterations, 3 failures → task split
+  - git_automation.py: Branch create, diff apply, commit, push, PR creation
+  - api_check.py: API key validation before harness run
+  - cli.py: build/bugfix/smoke-test commands
+  - pyproject.toml: Package config with pydantic + httpx deps
+- All Python imports verified, backend ruff check passes, frontend tsc + vite build pass
+- **Learnings for future iterations:**
+  - Modules use relative imports (`.contract`) for package imports, with fallback to absolute for CLI direct execution
+  - `code_harness` imports need the package to be on sys.path — works when run from parent dir with `python -m code_harness.cli`
+  - Orchestrator handles both Planner and Generator context managers, but only compacts Generator (256K absolute threshold)
+  - Handoff uses atomic writes (write .tmp then replace) to prevent partial files
+---
+
+## [2026-04-30 22:00] - US-009
+- Implemented Code Harness automated code generation pipeline
+- Files created:
+  - code_harness/__init__.py, __main__.py: Package entry point and CLI
+  - code_harness/llm_client.py: LLM client with agent configs (Planner: deepseek-v4-pro, Generator: qwen3.6-plus, Evaluator: deepseek-v4-pro)
+  - code_harness/contract.py: Structured Contract schema (ContractMode, AcceptanceCriterion, BugReport)
+  - code_harness/planner.py: Planner produces Contract from brief
+  - code_harness/generator.py: Generator produces unified diffs from Contract
+  - code_harness/evaluator.py: Evaluator scores on 6 dimensions (security, error_handling, boundary_conditions, api_stability, test_coverage, code_style)
+  - code_harness/orchestrator.py: Full pipeline with diff/review loop, max 10 iterations, max 3 generator failures triggers task split
+  - code_harness/context_manager.py: Token budget management with compaction thresholds
+  - code_harness/handoff.py: Run directory management (contract.json, diffs, reviews, PASSED.json, FAILED.json)
+  - code_harness/api_check.py: API key validation before harness runs
+  - code_harness/cli.py: CLI with build/bugfix/smoke-test commands
+  - code_harness/git_automation.py: Git operations (branch, diff apply, commit, push, PR)
+- Features: structured handoff protocol, 6-dimension scoring with 70% pass threshold, context management with compaction, atomic file writes, CLI entry point
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes
+- **Learnings for future iterations:**
+  - Generator produces unified diffs (not full file content) for cleaner code application
+  - Run directories under code_harness/runs/<timestamp>/ store all artifacts atomically
+  - `validate_api_keys` in api_check.py uses sync httpx; orchestrator also has async version
+  - CLI entry via `python -m code_harness` or `python -m code_harness.cli`
+---
+
+## [2026-04-30 22:30] - US-010
+- Verified API key validation already implemented via api_check.py
+- No code changes needed — all acceptance criteria met:
+  - validate_api_keys() checks CODE_PLANNER_API_KEY, CODE_GENERATOR_API_KEY, CODE_EVALUATOR_API_KEY from .env
+  - Each key is tested via POST to /chat/completions endpoint
+  - MISSING/INVALID status reported per key
+  - CLI (cli.py) blocks run if any key is invalid
+- Lint (ruff check) passes
+---
+
+## [2026-04-30 23:00] - US-011
+- Implemented BOSS直聘 data scraper with Playwright Chromium
+- Files created:
+  - backend/app/utils/__init__.py: Package init for utilities
+  - backend/app/utils/rate_limiter.py: Token Bucket rate limiter (QPS ≤ 1.0, async acquire)
+  - backend/app/utils/robots_checker.py: robots.txt fetch, parse, and compliance checker
+  - backend/app/services/boss_scraper.py: BossZhipinScraper class with full Playwright pipeline
+- Files changed:
+  - backend/app/services/__init__.py: Exported BossZhipinScraper
+  - backend/app/services/chat_service.py: Integrated scraper into search_jobs; falls back to DB query then mock data
+- Features: Playwright headless Chromium with stealth mode (webdriver masking, realistic UA/viewport/locale), robots.txt compliance check before each URL, Token Bucket rate limiting (1 req/sec), exponential backoff retry (max 3 attempts, 2s base delay), anti-scraping evasion via --disable-blink-features=AutomationControlled, job card parsing from search results, detail page parsing for full description/skills, skill keyword extraction from job text, salary parsing (e.g. "15-25K" → 15000/25000), city matching from 20 predefined city codes, DB persistence with source+source_id uniqueness, best-effort scraper (non-blocking on failure, falls back to existing data)
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes
+- **Learnings for future iterations:**
+  - Scraper runs synchronously within search_jobs — in production, consider running in a background task and returning cached results
+  - `playwright install chromium` needed before scraper can run (already in pyproject.toml deps)
+  - BOSS直聘 city codes use numeric IDs (e.g. 101010100 for 北京) — mapping in CITY_CODES dict
+  - Stealth script injected via page.add_init_script — masks navigator.webdriver, adds fake chrome.runtime
+  - Rate limiter uses time.monotonic() for clock stability (not time.time())
+  - Token Bucket capacity=1.0 means no burst — strictly 1 request per second
+  - User-Agent strings constructed via format string to stay under 120 char ruff line limit
+---
+
+## [2026-04-30 23:30] - US-012
+- Implemented 今日招聘 data scraper with Playwright Chromium
+- Files created:
+  - backend/app/services/today_job_scraper.py: TodayJobScraper class with full Playwright pipeline
+- Files changed:
+  - backend/app/services/chat_service.py: Added 今日招聘 scraper call alongside BOSS直聘 in search_jobs
+  - backend/app/services/__init__.py: Exported TodayJobScraper
+- Features: Playwright headless Chromium with stealth mode, robots.txt compliance, Token Bucket rate limiting (1 req/sec), exponential backoff retry (max 3 attempts, 2s base delay), job card parsing from search results, detail page parsing for full description/skills, skill keyword extraction, salary parsing, city matching from 20 predefined cities, DB persistence with source+source_id uniqueness, best-effort scraper (non-blocking on failure)
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes
+- **Learnings for future iterations:**
+  - 今日招聘 uses different URL patterns — source_id extraction regex handles multiple patterns (job/position/detail)
+  - Both scrapers run sequentially in search_jobs — consider background task if latency becomes an issue
+  - CSS selectors are generic/fallback-friendly since live DOM structure may vary
+  - TARGET_CITIES list uses Chinese names directly (same matching logic as BOSS直聘 CITY_CODES)
+---
+
+## [2026-04-30 22:30] - US-013
+- Implemented RAG vector retrieval pipeline
+- Files created:
+  - backend/app/rag/embedder.py: 1024-dim vector generation via Embed Server (httpx to EMBED_BASE_URL), keyword fallback with known skill mapping
+  - backend/app/rag/retriever.py: Hybrid search — pgvector cosine similarity + keyword matching, city filter, exclude already-recommended, Top 10
+- Files changed:
+  - backend/app/services/chat_service.py: Integrated retriever as primary DB query, falls back to direct keyword query if no embeddings
+- Features: user skills embedded into 1024-dim vector, cosine similarity against job embeddings, combined score (60% vector + 40% keyword), salary_max tiebreaker
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes, vite build succeeds
+- **Learnings for future iterations:**
+  - pgvector cosine similarity uses raw SQL `1 - (embedding <=> :vec)` — SQLAlchemy ORM doesn't support `<=>` operator natively
+  - Embed Server fallback uses deterministic keyword hashing — ensures retrieval works even without external embed service
+  - Retrieval happens AFTER scraping — fresh data first, then semantic matching
+---
+
+## [2026-04-30 23:00] - US-015
+- Implemented job ingestion with auto-dedup and embedding generation
+- Files created:
+  - backend/app/rag/ingestor.py: ingest_jobs function — auto skill extraction, ON CONFLICT DO NOTHING dedup, auto-embed new jobs
+- Features: scraped jobs inserted into JobPosting table, skill keywords extracted from description, embeddings generated and stored, 30-day expiry
+- Backend lint (ruff check) passes
+- **Learnings for future iterations:**
+  - ON CONFLICT DO NOTHING uses PostgreSQL dialect — SQLAlchemy's `insert()` from `postgresql.dialects`
+  - Embedding generation happens inline during ingest — consider background task for large batches
+  - `uq_source_source_id` constraint name must match the one defined in JobPosting model
+---
+
+## [2026-04-30 23:30] - US-014
+- Implemented Docker containerized deployment
+- Files created:
+  - infra/docker-compose.yml: PostgreSQL+pgvector, Redis, MinIO, Backend API, Frontend with health checks
+  - backend/Dockerfile: Python 3.12-slim with uvicorn on port 8000
+  - frontend/Dockerfile: Node 20 builder + nginx serving dist on port 80
+  - frontend/nginx.conf: SPA routing + /api proxy to backend
+  - .env.example: Template for all required env vars
+- Features: one-command startup via docker compose up -d, independent health checks, nginx reverse proxy for frontend→backend API
+- Backend lint (ruff check) passes, frontend typecheck (tsc --noEmit) passes, vite build succeeds
+- **Learnings for future iterations:**
+  - pgvector/pgvector Docker image already includes the vector extension — no manual install needed
+  - Frontend nginx proxies /api/ to backend service by name (docker compose DNS)
+  - Backend health check uses curl (installed in Dockerfile) — lightweight Alpine images may lack curl
+---

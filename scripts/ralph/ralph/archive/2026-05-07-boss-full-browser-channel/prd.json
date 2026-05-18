@@ -1,0 +1,73 @@
+{
+  "project": "JobMatchingBot",
+  "branchName": "ralph/llm-skill-extraction",
+  "description": "LLM技能关键词提取 — 用户输入自然语言描述或上传简历，通过DeepSeek V4 Flash自动提取技能关键词，经RAG匹配数据库岗位。纯后端改动，不修改前端UI",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "新建技能提取服务模块",
+      "description": "As a backend system, I need a standalone skill extraction service that calls LLM to extract standardized skill keywords from text, with keyword fallback when LLM is unavailable.",
+      "acceptanceCriteria": [
+        "新建 backend/app/services/skill_extractor.py",
+        "实现 async extract_skills(text: str) -> list[str] — 调用 DeepSeek V4 Flash API（非 thinking 模式，不传 thinking 参数），POST {CONTENT_BASE_URL}/chat/completions，30s 超时，3次重试指数退避",
+        "实现 extract_skills_keyword_fallback(text: str) -> list[str] — ~80个技术关键词（含LangChain、RAG、Agent、PyTorch、HuggingFace、Kafka、Kubernetes等）大小写不敏感匹配",
+        "CONTENT_API_KEY 为空时跳过 LLM 调用直接走 keyword fallback",
+        "LLM 响应解析失败时降级到 keyword fallback 并 log WARNING",
+        "System prompt 用英文，要求只返回 JSON 数组，排除软技能，推断隐含技能（Django→Python），最多20个技能",
+        "ruff check 通过"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "参考 code_harness/llm_client.py 的 httpx 调用模式。使用 settings.CONTENT_API_KEY 和 settings.CONTENT_BASE_URL"
+    },
+    {
+      "id": "US-002",
+      "title": "添加技能提取配置项",
+      "description": "As a developer, I need configurable skill extraction parameters in config.py for future tuning.",
+      "acceptanceCriteria": [
+        "在 backend/app/core/config.py 新增 SKILL_EXTRACTOR_MODEL（默认 deepseek-v4-flash）",
+        "新增 SKILL_EXTRACTOR_TIMEOUT（默认 30）",
+        "新增 SKILL_EXTRACTOR_MAX_SKILLS（默认 20）",
+        "skill_extractor.py 从 settings 读取这些配置（不硬编码）",
+        "ruff check 通过"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "US-001 先用默认值实现，US-002 将默认值迁移到 config.py 统一管理"
+    },
+    {
+      "id": "US-003",
+      "title": "聊天消息接入 LLM 技能提取",
+      "description": "As a job search bot, I need to extract skill keywords from every incoming user message via LLM, replace the frontend-supplied skills with extracted ones, then use them for RAG job search. Each message is independent — no conversation history sent to LLM. Returned job URLs must not duplicate previously recommended URLs.",
+      "acceptanceCriteria": [
+        "修改 backend/app/api/chat_router.py 的 send_message 端点（line 127 之后）",
+        "保存用户消息后、调用 search_jobs() 前，调用 extract_skills(req.message) 提取技能",
+        "提取的技能替换 req.skills 传给 search_jobs()",
+        "LLM 调用只传当前消息文本，不传历史对话上下文",
+        "返回的岗位 URL 不重复（利用现有 _get_recommended_urls_from_messages 去重机制）",
+        "LLM 提取完全失败时降级到 keyword fallback，RAG 仍可正常搜索",
+        "前端 UI 结构和 job card 输出样式不变",
+        "ruff check 通过"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "依赖 US-001(skill_extractor) 和 US-002(config)。现有 URL 去重在 chat_service.search_jobs() 内已实现，无需新增"
+    },
+    {
+      "id": "US-004",
+      "title": "简历上传接入 LLM 技能提取",
+      "description": "As a user, when I upload my resume the system should extract skills via LLM from the full resume text, replacing the current 27-keyword hardcoded matching to recognize modern tech like LangChain, RAG, Agent, Kubernetes.",
+      "acceptanceCriteria": [
+        "修改 backend/app/api/resumes_router.py 的 upload_resume 端点",
+        "保留 parse_resume() 做文本提取（PDF/DOCX/TXT），不修改 resume_parser.py",
+        "将 parse_resume() 返回的 text 传给 extract_skills() 做 LLM 技能提取",
+        "LLM 提取失败时降级到 keyword fallback，不影响前端 SkillEditor 展示",
+        "前端 SkillEditor 确认流程不受影响",
+        "ruff check 通过"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "依赖 US-001(skill_extractor)。parse_resume() 的文本提取逻辑完全保留，只替换技能提取部分"
+    }
+  ]
+}

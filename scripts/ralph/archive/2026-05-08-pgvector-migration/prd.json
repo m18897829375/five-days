@@ -1,0 +1,201 @@
+{
+  "project": "JobMatchingBot",
+  "branchName": "ralph/rag-optimization",
+  "description": "RAG 检索系统全面优化 — embed server 恢复 + 查询增强 + 多向量表示 + 重排序 + 缓存 + 评估体系，覆盖嵌入层到检索结果的全链路强化",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "添加 BGE-M3 Embedding 服务到 Docker Compose",
+      "description": "As a developer, I need a local BGE-M3 embedding service running in Docker to generate real semantic vectors, replacing the current keyword fallback pseudo-vectors.",
+      "acceptanceCriteria": [
+        "infra/docker-compose.yml 新增 embed 服务，使用 BGE-M3 模型",
+        "服务暴露端口 8001，提供 /embeddings HTTP 端点",
+        "输入格式：{\"input\": \"text\", \"model\": \"bge-m3\", \"dimensions\": 1024}",
+        "输出格式：{\"data\": [{\"embedding\": [1024 floats]}]}",
+        "docker compose up embed 可正常启动，curl localhost:8001/embeddings 返回有效向量",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "更新 embedder.py 适配 BGE-M3 服务并添加重试",
+      "description": "As a developer, I need to update the embedder module to call the new BGE-M3 service with proper error handling and keep keyword fallback as a last resort.",
+      "acceptanceCriteria": [
+        "backend/app/rag/embedder.py 的 embed_text() 主通道指向 BGE-M3 服务",
+        "请求体适配 BGE-M3 的输入格式",
+        "保留 _keyword_fallback() 作为后备（embed server 不可用时）",
+        "添加连接超时和重试逻辑（timeout=10s, retries=2）",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "全量重建嵌入向量",
+      "description": "As a developer, I need to regenerate all job embeddings with BGE-M3 real vectors to replace the 773 pseudo-vectors in the database.",
+      "acceptanceCriteria": [
+        "backend/scripts/generate_embeddings.py 可正常连接 embed server",
+        "脚本一次性为所有活跃岗位生成新嵌入",
+        "旧伪向量被 ON CONFLICT DO UPDATE 正确替换",
+        "数据库 SELECT COUNT(*) FROM job_embeddings 与活跃岗位数一致",
+        "随机抽取 10 条嵌入验证维度=1024 且非伪向量（值不全为 0.0/1.0/0.1）",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "配置 HNSW ef_search 查询参数",
+      "description": "As a developer, I need to set hnsw.ef_search=100 before each vector query to improve HNSW index recall.",
+      "acceptanceCriteria": [
+        "backend/app/rag/retriever.py 中在向量查询前执行 SET hnsw.ef_search = 100",
+        "不影响其他数据库操作",
+        "通过 EXPLAIN ANALYZE 确认 HNSW 索引被正确使用",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "添加查询改写（Query Rewriting）— 本地 Ollama DeepSeek-R1-Distill-Qwen-7B",
+      "description": "As a user, I want skill keywords to be rewritten into natural language queries via a local Ollama model (deepseek-r1:7b-qwen-distill-q4_K_M) so that queries are semantically closer to job descriptions.",
+      "acceptanceCriteria": [
+        "新增 backend/app/rag/query_rewriter.py 模块",
+        "使用 httpx 调用 Ollama API (localhost:11434) 的 deepseek-r1:7b-qwen-distill-q4_K_M 模型",
+        "系统 prompt 要求将技能列表改写为自然语言岗位搜索查询",
+        "输入 [\"Python\", \"Django\"] → 输出类似 '寻找 Python 后端开发岗位，使用 Django 框架进行 Web 开发'",
+        "改写失败时降级为原始技能拼接，不影响正常搜索",
+        "chat_service.py 在 RAG 检索前调用查询改写",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "添加 HyDE 假设文档嵌入",
+      "description": "As a user, I want the system to generate a hypothetical perfect job description via LLM and use its embedding for retrieval, so that query vectors are closer to real JD semantic distributions.",
+      "acceptanceCriteria": [
+        "新增 backend/app/rag/hyde.py 模块",
+        "generate_hypothetical_doc(skills) 调用 LLM 生成一段假设的岗位描述",
+        "将假设文档嵌入后用作检索向量（替代原始查询向量）",
+        "HyDE 生成失败时降级为查询改写结果或原始查询",
+        "集成到 retriever.py 的检索流程中",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "实现多向量表示 — Title/Skills/Description 分嵌",
+      "description": "As a developer, I need separate embeddings for job title, skills, and description with weighted scoring at retrieval time, so that semantic differentiation is improved.",
+      "acceptanceCriteria": [
+        "job_embeddings 表新增 title_embedding、skills_embedding 列，均 vector(1024)",
+        "创建对应 HNSW 索引（m=16, ef_construction=200, vector_cosine_ops）",
+        "运行 Alembic 迁移，迁移包含旧数据回填逻辑",
+        "ingestor.py 在入库时为三个字段分别生成嵌入",
+        "retriever.py 检索时分别计算三个向量的余弦相似度，按 0.5:0.3:0.2 加权合并",
+        "旧单向量 embedding 列保留以兼容",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "HNSW 索引参数优化为 m=24, ef_construction=300",
+      "description": "As a developer, I need to tune HNSW index parameters for better balance between build time, query speed, and recall.",
+      "acceptanceCriteria": [
+        "idx_job_embeddings_embedding_cosine 重建为 m=24, ef_construction=300",
+        "三个新列的 HNSW 索引也使用相同参数",
+        "创建 Alembic 迁移文件（先 DROP 旧索引，再 CREATE 新索引）",
+        "查询时 ef_search 设为 100",
+        "索引重建后查询延迟不超过 50ms（在 773 条数据上）",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "添加 FlashRank 重排序",
+      "description": "As a user, I want coarse search results to be re-ranked by a cross-encoder model so the most relevant jobs appear at the top.",
+      "acceptanceCriteria": [
+        "新增 backend/app/rag/reranker.py 模块",
+        "使用 flashrank 包（ms-marco-MiniLM-L-12-v2 模型）",
+        "rerank(query, candidates) 接收粗筛结果，返回重排后列表",
+        "集成到 retriever.py：先粗筛 top-30 → FlashRank 重排 → 取 top-10",
+        "首次加载模型耗时 < 2s，单次重排 < 50ms",
+        "重排失败降级为原始排序，不影响正常搜索",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "添加 Redis 语义缓存",
+      "description": "As a user, I want repeated skill searches to return instantly from cache, avoiding redundant embedding computation and retrieval.",
+      "acceptanceCriteria": [
+        "新增 backend/app/rag/cache.py 模块",
+        "缓存 key = rag:emb:{md5(sorted_skills)}，value = JSON 嵌入向量，TTL 1 小时",
+        "embedder.py 的 embed_text() 优先查缓存，命中则直接返回",
+        "完整搜索结果也支持缓存 rag:result:{md5}，TTL 10 分钟",
+        "Redis 不可用时自动降级，不影响搜索",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "实现查询分解 + RRF 融合",
+      "description": "As a user, when I input multiple skills from different domains (e.g., Python, React, Docker), the system should decompose into independent queries and merge results via Reciprocal Rank Fusion.",
+      "acceptanceCriteria": [
+        "新增 backend/app/rag/query_decomposer.py 模块",
+        "当技能数 >= 3 时自动触发查询分解",
+        "每个技能独立调用 retrieve_jobs() 获取 top-10",
+        "使用 RRF 公式合并：score = Σ 1/(k + rank)，k=60",
+        "最终取 top-10 返回",
+        "单技能时不分解，直接走正常流程",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "建立 RAGAS 评估体系",
+      "description": "As a developer, I need a quantifiable evaluation framework to measure each RAG optimization's effect and ensure improvements are real.",
+      "acceptanceCriteria": [
+        "新增 backend/tests/eval/ 目录，包含评估脚本",
+        "创建 eval_queries.json：20 个典型查询（单技能/多技能/中文/英文/混合），每个查询手工标注 3-5 个相关岗位",
+        "集成 RAGAS 库计算 Context Precision、Context Recall、Faithfulness、Answer Relevancy",
+        "评估脚本 run_eval.py 可一键运行并输出报告（JSON + 控制台摘要）",
+        "查询覆盖不同城市和薪资范围",
+        "评估结果记录基线值，供后续优化对比",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
