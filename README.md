@@ -2,6 +2,10 @@
 
 一个基于 Next.js 16 的全栈健康测评 Web 应用。用户通过 5 步问卷（年龄 → 性别 → 身体数据 → 目标 → 运动频率）完成测评后，系统使用 Mifflin-St Jeor 公式计算 BMI、BMR、TDEE，并生成个性化饮食与运动计划。支持 FREE/PREMIUM 订阅差异化结果展示，PREMIUM 用户可查看完整体重预测趋势和营养方案。
 
+## 线上地址
+
+**公网直达：** [https://health-assessment-bay.vercel.app](https://health-assessment-bay.vercel.app)
+
 ## 技术栈
 
 | 类别 | 技术 |
