@@ -4,7 +4,7 @@
 
 ## 线上地址
 
-**公网直达：** [https://health-assessment-bay.vercel.app](https://health-assessment-bay.vercel.app)
+**公网直达：** [https://five-days-58ppl4b44z.edgeone.cool](https://five-days-58ppl4b44z.edgeone.cool)
 
 ## 技术栈
 
@@ -87,7 +87,7 @@ npm run dev
 > 提示：`| jq .` 仅用于格式化 JSON 输出，如未安装 jq 可省略管道部分（如 `curl -s -c cookie.txt -X POST $BASE/api/session`）。
 
 ```bash
-BASE="https://health-assessment-bay.vercel.app"
+BASE="https://five-days-58ppl4b44z.edgeone.cool"
 
 # 1. 创建匿名会话
 curl -s -c cookie.txt -X POST $BASE/api/session | jq .
@@ -149,7 +149,7 @@ curl -s $BASE/api/test/premium-session | jq .
 {
   "sessionId": "e83bb9d8-825f-4317-b204-855dcac495ba",
   "subscription": "PREMIUM",
-  "curlExample": "curl -s -H 'Cookie: sessionId=e83bb9d8-825f-4317-b204-855dcac495ba' https://health-assessment-bay.vercel.app/api/results | jq ."
+  "curlExample": "curl -s -H 'Cookie: sessionId=e83bb9d8-825f-4317-b204-855dcac495ba' https://five-days-58ppl4b44z.edgeone.cool/api/results | jq ."
 }
 ```
 
